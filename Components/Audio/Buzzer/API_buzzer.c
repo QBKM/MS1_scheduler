@@ -91,4 +91,5 @@ void API_BUZZER_START(void)
     status = xTaskCreate(buzzer_handler, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
 
     //if status == echec -> notify surveillance
+    //klklklklkl ,n,n,n,n
 }
