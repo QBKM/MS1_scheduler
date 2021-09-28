@@ -13,11 +13,7 @@
    include
 -- ------------------------------------------------------------- */
 #include "API_buzzer.h"
-
-#include "FreeRTOS.h"
 #include "task.h"
-#include "queue.h"
-
 #include "gpio.h"
 
 /* ------------------------------------------------------------- --
@@ -34,15 +30,13 @@
 /* ------------------------------------------------------------- --
    variable
 -- ------------------------------------------------------------- */
-static STRUCT_buzzer_t buzzer = {0};
-
 TaskHandle_t TaskHandle_buzzer;
-QueueHandle_t QueueHandle_buzzer;
+static API_BUZZER_t buzzer = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
-static void buzzer_handler(void* parameters);
+static void handler_buzzer(void* parameters);
 
 /* ------------------------------------------------------------- --
    tasks
@@ -52,7 +46,7 @@ static void buzzer_handler(void* parameters);
  * 
  * @param       parameters 
  * ************************************************************* **/
-static void buzzer_handler(void* parameters)
+static void handler_buzzer(void* parameters)
 {
     TickType_t last_wakeup_time;
     last_wakeup_time = xTaskGetTickCount();
@@ -86,9 +80,9 @@ void API_BUZZER_START(void)
     buzzer.period = BUZZER_DEFAULT_PERIOD;
     buzzer.dutycycle = BUZZER_DEFAULT_DUTYCYCLE;
 
-    QueueHandle_buzzer = xQueueCreate (1, sizeof(STRUCT_buzzer_t));
+    QueueHandle_buzzer = xQueueCreate (1, sizeof(API_BUZZER_t));
     
-    status = xTaskCreate(buzzer_handler, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
+    status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
 
     //if status == echec -> notify surveillance
 }
