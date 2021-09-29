@@ -16,6 +16,7 @@
    includes
 -- ------------------------------------------------------------- */
 #include "stdint.h"
+#include "stdbool.h"
 
 #include "FreeRTOS.h"
 #include "queue.h"
@@ -23,11 +24,16 @@
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
+typedef struct
+{
+   bool  isOk;
+   float volt;
+}STRUCT_BATERRY_t;
+
 typedef struct STRUCT_battery_t
 {
-    uint16_t   period;
-    float      volt_sch;
-    float      volt_motor;
+    STRUCT_BATERRY_t scheduler;
+    STRUCT_BATERRY_t motor;
 }API_BATTERY_t;
 
 /* ------------------------------------------------------------- --
