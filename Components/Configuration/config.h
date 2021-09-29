@@ -15,20 +15,20 @@
 /* ------------------------------------------------------------- --
    Audio
 -- ------------------------------------------------------------- */
+#define BUZZER_NOTIFY_INIT_ID               0x00000001
+
 #define BUZZER_DEFAULT_PERIOD               1000
 #define BUZZER_DEFAULT_DUTYCYCLE            0.015
-
-#define BUZZER_NOTIFY_INIT_ID               0x00000001
 
 /* ------------------------------------------------------------- --
    Battery
 -- ------------------------------------------------------------- */
-#define BATTERY_DEFAULT_MAX_VOLTAGE         18
-#define BATTERY_DEFAULT_ADC_RANGE           1024
-
 #define BATTERY_NOTIFY_INIT_ID              0x00000002
-#define BATTERY_NOTIFY_BATT_SCHEDULER_ID    0x00001000
-#define BATTERY_NOTIFY_BATT_MOTOR_ID        0x00002000
+
+#define BATTERY_DEFAULT_MAX_VOLTAGE         18
+#define BATTERY_DEFAULT_THRESHOLD_VOLTAGE   7.5
+#define BATTERY_DEFAULT_ADC_RANGE           1024
+#define BATTERY_DEFAULT_PERIOD              1000
 
 /* ------------------------------------------------------------- --
    Datalog
@@ -56,12 +56,6 @@
 #define SENSORS_NOTIFY_THERMO_ID            0x10000000
 
 /* ------------------------------------------------------------- --
-   System
--- ------------------------------------------------------------- */
-#define SYSTEM_NOTIFY_INIT_ID               0x00000080
-
-
-/* ------------------------------------------------------------- --
    List flag monitoring
 -- ------------------------------------------------------------- */
 /* Monitoring notify list :
@@ -72,13 +66,13 @@
  * 0x00000010   
  * 0x00000020   id radio
  * 0x00000040   id sensors
- * 0x00000080   id system
+ * 0x00000080
  * 0x00000100
  * 0x00000200
  * 0x00000400
  * 0x00000800
- * 0x00001000   id battery sch
- * 0x00002000   id battery motor
+ * 0x00001000
+ * 0x00002000
  * 0x00004000
  * 0x00008000
  * 0x00010000
