@@ -16,6 +16,8 @@
 #include "task.h"
 #include "gpio.h"
 
+#include "config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
@@ -84,5 +86,8 @@ void API_BUZZER_START(void)
     
     status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
 
-    //if status == echec -> notify surveillance
+   if(status != pdPASS)
+   {
+      xTaskNotify(xTaskGetHandle("task_application"), BUZZER_NOTIFY_INIT_ID, eSetBits);
+   }
 }
