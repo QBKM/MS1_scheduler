@@ -112,7 +112,7 @@ void API_BATTERY_START(void)
         xTaskNotify(xTaskGetHandle("task_application"), BATTERY_NOTIFY_INIT_ID, eSetBits);
     }
 
-   QueueHandle_battery = xQueueCreate(1, API_BATTERY_t);
+   QueueHandle_battery = xQueueCreate(1, sizeof(API_BATTERY_t));
 }
 
 
