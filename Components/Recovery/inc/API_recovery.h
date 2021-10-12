@@ -1,40 +1,51 @@
 /** ************************************************************* *
- * @file        API_baterry.h
+ * @file        API_recovery.h
  * @brief       
  * 
- * @date        2021-08-16
+ * @date        2021-10-11
  * @author      Quentin Bakrim (quentin.bakrim@hotmail.fr)
  * 
  * Mines Space
  * 
  * ************************************************************* **/
 
-#ifndef SUPPLY_BATTERY_INC_API_BATTERY_H_
-#define SUPPLY_BATTERY_INC_API_BATTERY_H_
+#ifndef RECOVERY_INC_API_RECOVERY_H_
+#define RECOVERY_INC_API_RECOVERY_H_
 
 /* ------------------------------------------------------------- --
    includes
 -- ------------------------------------------------------------- */
 #include "stdint.h"
 
+#include "FreeRTOS.h"
+#include "queue.h"
+
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
-typedef struct STRUCT_battery_t
+/* List of commands available for this API. 
+ * -> Stop command      : will stop the motors 
+ * -> Open/Close command: will run the motors until reach the end */
+typedef enum
 {
-    uint16_t   period;
-    float      volt_sch;
-    float      volt_motor;
-}STRUCT_battery_t;
+    E_CMD_NONE,
+    E_CMD_STOP,
+    E_CMD_OPEN,
+    E_CMD_CLOSE
+}ENUM_CMD_ID_t;
+
+/* ------------------------------------------------------------- --
+   variables
+-- ------------------------------------------------------------- */
+QueueHandle_t QueueHandle_recovery;
 
 /* ------------------------------------------------------------- --
    functions
 -- ------------------------------------------------------------- */
-uint8_t init_battery(void);
-void 	set_battery_period(uint16_t period);
-
-#endif /* SUPPLY_BATTERY_INC_API_BATTERY_H_ */
+void API_RECOVERY_START(void);
 
 /* ------------------------------------------------------------- --
    end of file
 -- ------------------------------------------------------------- */
+
+#endif /* RECOVERY_INC_API_RECOVERY_H_ */
