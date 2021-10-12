@@ -9,6 +9,7 @@
  * 
  * ************************************************************* **/
 
+
 /* ------------------------------------------------------------- --
    include
 -- ------------------------------------------------------------- */
@@ -19,8 +20,8 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define BUZZER_DEFAULT_PERIOD       1000
-#define BUZZER_DEFAULT_DUTYCYCLE    0.015
+#define BUZZER_DEFAULT_PERIOD       1000u
+#define BUZZER_DEFAULT_DUTYCYCLE    0.015f
 
 /* ------------------------------------------------------------- --
    handles
@@ -77,11 +78,14 @@ void API_BUZZER_START(void)
 {
     BaseType_t status;
 
-    buzzer.period = BUZZER_DEFAULT_PERIOD;
+    /* init the main structure */
+    buzzer.period    = BUZZER_DEFAULT_PERIOD;
     buzzer.dutycycle = BUZZER_DEFAULT_DUTYCYCLE;
 
+    /* create the queue */
     QueueHandle_buzzer = xQueueCreate (1, sizeof(STRUCT_BUZZER_t));
     
+    /* create the task */
     status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
     configASSERT(status == pdPASS);
 }
