@@ -28,7 +28,7 @@ typedef struct
 {
     uint16_t    period;
     float       dutycycle;
-}API_BUZZER_t;
+}STRUCT_BUZZER_t;
 
 /* ------------------------------------------------------------- --
    variables

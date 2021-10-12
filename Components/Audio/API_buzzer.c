@@ -16,61 +16,59 @@
 #include "task.h"
 #include "gpio.h"
 
-#include "config.h"
-
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#ifndef BUZZER_DEFAULT_PERIOD
 #define BUZZER_DEFAULT_PERIOD       1000
-#endif
-
-#ifndef BUZZER_DEFAULT_DUTYCYCLE
 #define BUZZER_DEFAULT_DUTYCYCLE    0.015
-#endif
+
+/* ------------------------------------------------------------- --
+   handles
+-- ------------------------------------------------------------- */
+TaskHandle_t TaskHandle_buzzer;
 
 /* ------------------------------------------------------------- --
    variable
 -- ------------------------------------------------------------- */
-TaskHandle_t TaskHandle_buzzer;
-static API_BUZZER_t buzzer = {0};
+static STRUCT_BUZZER_t buzzer = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
 static void handler_buzzer(void* parameters);
 
-/* ------------------------------------------------------------- --
-   tasks
--- ------------------------------------------------------------- */
+/* ============================================================= ==
+   tasks functions
+== ============================================================= */
 /** ************************************************************* *
- * @brief       toggle the buzzer periodicly with a dutycycle
+ * @brief       This task manage the buzzer system with two 
+ *              parameters. 
+ *              - The period
+ *              - The dutycycle
+ *              The task need to receive command from queue to 
+ *              operate.
+ *              Please check at the STRUCT_BUZZER_t structure
+ *              to send new parameters
  * 
  * @param       parameters 
  * ************************************************************* **/
 static void handler_buzzer(void* parameters)
 {
-    TickType_t last_wakeup_time;
-    last_wakeup_time = xTaskGetTickCount();
-
     while(1)
     {
-        /* check parameters update */
-        xQueueReceive(QueueHandle_buzzer, &buzzer, 0);
-
         /* (alpha) part of dutycycle */
         HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-        xTaskDelayUntil(&last_wakeup_time, pdMS_TO_TICKS(buzzer.period * buzzer.dutycycle));
+        xQueueReceive(QueueHandle_buzzer, &buzzer, pdMS_TO_TICKS(buzzer.period * buzzer.dutycycle));
 
         /* (1 - alpha) part of dutycycle */
         HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-        xTaskDelayUntil(&last_wakeup_time, pdMS_TO_TICKS(buzzer.period - buzzer.period * buzzer.dutycycle));
+        xQueueReceive(QueueHandle_buzzer, &buzzer, pdMS_TO_TICKS(buzzer.period - buzzer.period * buzzer.dutycycle));
     }
 }
 
-/* ------------------------------------------------------------- --
-   functions
--- ------------------------------------------------------------- */
+/* ============================================================= ==
+   public functions
+== ============================================================= */
 /** ************************************************************* *
  * @brief       init and start the buzzer task
  * 
@@ -82,12 +80,12 @@ void API_BUZZER_START(void)
     buzzer.period = BUZZER_DEFAULT_PERIOD;
     buzzer.dutycycle = BUZZER_DEFAULT_DUTYCYCLE;
 
-    QueueHandle_buzzer = xQueueCreate (1, sizeof(API_BUZZER_t));
+    QueueHandle_buzzer = xQueueCreate (1, sizeof(STRUCT_BUZZER_t));
     
     status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
-
-   if(status != pdPASS)
-   {
-      xTaskNotify(xTaskGetHandle("task_application"), BUZZER_NOTIFY_INIT_ID, eSetBits);
-   }
+    configASSERT(status == pdPASS);
 }
+
+/* ------------------------------------------------------------- --
+   end of file
+-- ------------------------------------------------------------- */
