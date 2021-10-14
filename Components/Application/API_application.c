@@ -15,7 +15,11 @@
 #include "stdbool.h"
 #include "stdint.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "API_application.h"
+#include "API_recovery.h"
 #include "API_buzzer.h"
 
 //#include "config.h"
@@ -23,7 +27,12 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
+/* notify flag IDs */
 #define APPLICATION_DEFAULT_AEROCONTACT_ID 0x08000000
+
+/* Buzzer settings */
+#define BUZZER_ASCEND_PERIOD        100u    /* [ms] */
+#define BUZZER_ASCEND_DUTYCYCLE     0.1f    /* ratio */
 
 /* ------------------------------------------------------------- --
    types
@@ -35,19 +44,21 @@ typedef struct
 }STRUCT_AEROCONTACT_t;
 
 /* ------------------------------------------------------------- --
-   variables
+   handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_application;
 
+/* ------------------------------------------------------------- --
+   variables
+-- ------------------------------------------------------------- */
+static STRUCT_AEROCONTACT_t aerocontact;
 static ENUM_PHASE_t phase;
-
-STRUCT_AEROCONTACT_t aerocontact;
-STRUCT_BUZZER_t buzzer;
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
 static void handler_application(void* parameters);
+static void notify_check(void);
 
 /* ------------------------------------------------------------- --
    functions
@@ -58,24 +69,10 @@ static void handler_application(void* parameters);
  * ************************************************************* **/
 static void handler_application(void* parameters)
 {
-    uint32_t notify_id;
-
-    //STRUCT_BARO_t pressure = {0};
-
     while(1)
     {
         /* check task notify */
-        if(xTaskNotifyWait(0,0, &notify_id, 0) == pdTRUE)
-        {
-            /* check aerocontact */
-            if(notify_id & APPLICATION_DEFAULT_AEROCONTACT_ID)
-            {
-                phase = E_PHASE_ASCEND;
-                buzzer.dutycycle = 0.1;
-                buzzer.period = 100;
-                xQueueSend(QueueHandle_buzzer, &buzzer, 0);
-            }
-        }
+        notify_check();
 
         //xTaskNotify(TaskHandle_sensors, 0, eNoAction);
 
@@ -96,6 +93,25 @@ static void handler_application(void* parameters)
         //xqueuesend radio
         //xqueuesend ihm
             //if status == ko => send msg + led
+    }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * ************************************************************* **/
+void notify_check(void)
+{
+    uint32_t notify_id;
+
+    if(xTaskNotifyWait(0,0, &notify_id, 0) == pdTRUE)
+    {
+        /* check aerocontact */
+        if(notify_id & APPLICATION_DEFAULT_AEROCONTACT_ID)
+        {
+            phase = E_PHASE_ASCEND;
+            API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
+        }
     }
 }
 
@@ -128,6 +144,7 @@ void API_APPLICATION_CALLBACK(void)
         aerocontact.flag = true;
         aerocontact.triggerDate = xTaskGetTickCountFromISR();
 
+        /* notify the application task with aerocontact ID flag */
         xTaskNotifyFromISR(TaskHandle_application, APPLICATION_DEFAULT_AEROCONTACT_ID, eSetBits, pdFALSE);
     }
 }
