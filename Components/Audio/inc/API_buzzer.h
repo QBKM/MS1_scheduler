@@ -17,28 +17,11 @@
 -- ------------------------------------------------------------- */
 #include "stdint.h"
 
-#include "FreeRTOS.h"
-#include "queue.h"
-
 /* ------------------------------------------------------------- --
-   types
--- ------------------------------------------------------------- */
-/* Buzzer config structure */
-typedef struct
-{
-    uint16_t    period;
-    float       dutycycle;
-}STRUCT_BUZZER_t;
-
-/* ------------------------------------------------------------- --
-   variables
--- ------------------------------------------------------------- */
-QueueHandle_t QueueHandle_buzzer;
-
-/* ------------------------------------------------------------- --
-   functions
+   function prototypes
 -- ------------------------------------------------------------- */
 void API_BUZZER_START(void);
+void API_BUZZER_SEND_PARAMETER(uint16_t period, float dutycycle);
 
 /* ------------------------------------------------------------- --
    end of file

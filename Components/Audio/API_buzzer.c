@@ -14,6 +14,8 @@
    include
 -- ------------------------------------------------------------- */
 #include "API_buzzer.h"
+#include "FreeRTOS.h"
+#include "queue.h"
 #include "task.h"
 #include "gpio.h"
 
@@ -24,9 +26,20 @@
 #define BUZZER_DEFAULT_DUTYCYCLE    0.015f
 
 /* ------------------------------------------------------------- --
+   types
+-- ------------------------------------------------------------- */
+/* Buzzer config structure */
+typedef struct
+{
+    uint16_t    period;
+    float       dutycycle;
+}STRUCT_BUZZER_t;
+
+/* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_buzzer;
+QueueHandle_t QueueHandle_buzzer;
 
 /* ------------------------------------------------------------- --
    variable
@@ -88,6 +101,18 @@ void API_BUZZER_START(void)
     /* create the task */
     status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_buzzer);
     configASSERT(status == pdPASS);
+}
+
+/** ************************************************************* *
+ * @brief       send new parameters to the buzzer task
+ * 
+ * @param       period 
+ * @param       dutycycle 
+ * ************************************************************* **/
+void API_BUZZER_SEND_PARAMETER(uint16_t period, float dutycycle)
+{
+    STRUCT_BUZZER_t param = {.dutycycle = dutycycle, .period = period};
+    xQueueSend(QueueHandle_buzzer, &param, 0);
 }
 
 /* ------------------------------------------------------------- --
