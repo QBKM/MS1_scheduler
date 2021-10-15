@@ -14,14 +14,16 @@
    include
 -- ------------------------------------------------------------- */
 #include "API_recovery.h"
+#include "freeRtos.h"
 #include "task.h"
 #include "gpio.h"
 #include "tim.h"
+#include "queue.h"
 
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define RECOVERY_DEFAULT_PERIOD_UPDATE  1u      /* [ms] */ 
+#define RECOVERY_DEFAULT_PERIOD_TASK    10u     /* [ms] */ 
 #define RECOVERY_DEFAULT_CCR2_M1        3840u   /* 80% PWM (ARR = 4800) */
 #define RECOVERY_DEFAULT_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
 
@@ -49,9 +51,10 @@ typedef struct
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_recovery;
+QueueHandle_t QueueHandle_recovery;
 
 /* ------------------------------------------------------------- --
-   variable
+   variables
 -- ------------------------------------------------------------- */
 static STRUCT_recovery_t recovery = {0};
 
@@ -74,6 +77,9 @@ static void handler_recovery(void* parameters);
  * ************************************************************* **/
 static void handler_recovery(void* parameters)
 {
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    
     ENUM_CMD_ID_t cmd = E_CMD_NONE;
 
     while(1)
@@ -169,8 +175,8 @@ static void handler_recovery(void* parameters)
              recovery.status = E_STATUS_CLOSE;
         }
 
-        /* wait until next check */
-        vTaskDelay(pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_UPDATE));
+        /* wait until next task period */
+        vTaskDelayUntil(xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
     }
 }
 
@@ -199,6 +205,16 @@ void API_RECOVERY_START(void)
     /* create the task */
     status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_recovery);
     configASSERT(status == pdPASS);
+}
+
+/** ************************************************************* *
+ * @brief       send a command to the recovery task
+ * 
+ * @param       cmd 
+ * ************************************************************* **/
+void API_RECOVERY_SEND_CMD(ENUM_CMD_ID_t cmd)
+{
+    xQueueSend(QueueHandle_recovery, &cmd, 0);
 }
 
 /* ------------------------------------------------------------- --
