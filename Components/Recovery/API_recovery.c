@@ -54,7 +54,7 @@ TaskHandle_t TaskHandle_recovery;
 QueueHandle_t QueueHandle_recovery;
 
 /* ------------------------------------------------------------- --
-   variable
+   variables
 -- ------------------------------------------------------------- */
 static STRUCT_recovery_t recovery = {0};
 

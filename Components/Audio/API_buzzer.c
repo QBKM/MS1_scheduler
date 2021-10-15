@@ -42,7 +42,7 @@ TaskHandle_t TaskHandle_buzzer;
 QueueHandle_t QueueHandle_buzzer;
 
 /* ------------------------------------------------------------- --
-   variable
+   variables
 -- ------------------------------------------------------------- */
 static STRUCT_BUZZER_t buzzer = {0};
 
