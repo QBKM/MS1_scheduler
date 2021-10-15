@@ -8,5 +8,5 @@ For more details, please contact me at : quentin.bakrim@hotmail.fr
 - SEQ BOARD (Scheduler board for MS1)
 
 ## Third Party Software
-- FreeRtos : the software use FreeRtos Kernel V10.4.3
+- FreeRtos : the software use FreeRTOS Kernel V10.4.3
 - SystemView : the realtime trace RTOS is available, systemView is setted for FreeRtos with Segger J-link debugger
