@@ -4,5 +4,5 @@ The software is a part of the Marsaut 1 mission. It aims to acquire and process 
 For more details, please contact me at : quentin.bakrim@hotmail.fr
 
 ## Target :
-- NUCLEO STM32f767ZI
+- STM32f767ZI
 - SEQ BOARD (Scheduler board for MS1)
