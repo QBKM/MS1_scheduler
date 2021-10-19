@@ -17,11 +17,14 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "timers.h"
 
 #include "API_application.h"
 #include "API_recovery.h"
 #include "API_buzzer.h"
+#include "API_HMI.h"
 
+#include "SEGGER_SYSVIEW.h"
 //#include "config.h"
 
 /* ------------------------------------------------------------- --
@@ -33,6 +36,11 @@
 /* Buzzer settings */
 #define BUZZER_ASCEND_PERIOD        100u    /* [ms] */
 #define BUZZER_ASCEND_DUTYCYCLE     0.1f    /* ratio */
+#define BUZZER_DESCEND_PERIOD       10u    /* [ms] */
+#define BUZZER_DESCEND_DUTYCYCLE    0.5f    /* ratio */
+
+#define WINDOW_IN_TIME              6000u /* [ms] */
+#define WINDOW_OUT_TIME             2000u /* [ms] */
 
 /* ------------------------------------------------------------- --
    types
@@ -40,13 +48,15 @@
 typedef struct
 {
     volatile bool       flag;
-    volatile uint32_t   triggerDate;
+    volatile TickType_t triggerDate;
 }STRUCT_AEROCONTACT_t;
 
 /* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_application;
+TimerHandle_t TimerHandle_window_in;
+TimerHandle_t TimerHandle_window_out;
 
 /* ------------------------------------------------------------- --
    variables
@@ -59,6 +69,7 @@ static ENUM_PHASE_t phase;
 -- ------------------------------------------------------------- */
 static void handler_application(void* parameters);
 static void notify_check(void);
+static void callback_timer_window_in(TimerHandle_t xTimer);
 
 /* ------------------------------------------------------------- --
    functions
@@ -69,6 +80,9 @@ static void notify_check(void);
  * ************************************************************* **/
 static void handler_application(void* parameters)
 {
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+
     while(1)
     {
         /* check task notify */
@@ -93,6 +107,7 @@ static void handler_application(void* parameters)
         //xqueuesend radio
         //xqueuesend ihm
             //if status == ko => send msg + led
+        xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
     }
 }
 
@@ -100,7 +115,7 @@ static void handler_application(void* parameters)
  * @brief       
  * 
  * ************************************************************* **/
-void notify_check(void)
+static void notify_check(void)
 {
     uint32_t notify_id;
 
@@ -111,8 +126,23 @@ void notify_check(void)
         {
             phase = E_PHASE_ASCEND;
             API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
+            API_HMI_SEND_DATA(HMI_ID_APP_AEROC, "start");
+            //UNION_HMI_DATA_t test.u8 = 123;
+            API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "Phase : ascend %d\n", 13);
+
+            //xTimerStart(TimerHandle_window_in, 0);
         }
     }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * ************************************************************* **/
+static void callback_timer_window_in(TimerHandle_t xTimer)
+{
+    phase = E_PHASE_DESCEND;
+    API_BUZZER_SEND_PARAMETER(BUZZER_DESCEND_PERIOD, BUZZER_DESCEND_DUTYCYCLE);
 }
 
 /** ************************************************************* *
@@ -129,8 +159,10 @@ void API_APPLICATION_START(void)
     aerocontact.triggerDate = 0xFFFFFFFF;
     
     status = xTaskCreate(handler_application, "task_application", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_application);
-
     configASSERT(status == pdPASS);
+
+    //TimerHandle_window_in = xTimerCreate("timer_window_in", pdMS_TO_TICKS(WINDOW_IN_TIME), pdFALSE, (void*)0, callback_timer_window_in);
+    //configASSERT(TimerHandle_window_in == NULL);
 }
 
 /** ************************************************************* *
