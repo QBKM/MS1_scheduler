@@ -176,7 +176,7 @@ static void handler_recovery(void* parameters)
         }
 
         /* wait until next task period */
-        vTaskDelayUntil(xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
     }
 }
 
