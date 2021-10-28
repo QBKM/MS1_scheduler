@@ -91,7 +91,7 @@ static void handler_application(void* parameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
-    static STRUCT_recovery_t MNTR_recov;
+    STRUCT_RECOV_MNTR_t MNTR_recov;
 
     while(1)
     {
