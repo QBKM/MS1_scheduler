@@ -98,7 +98,7 @@ static void handler_application(void* parameters)
         /* check task notify */
         notify_check();
 
-        API_RECOVERY_GET_MNTR(&MNTR_recov);
+        if(API_RECOVERY_GET_MNTR(&MNTR_recov)); // process_mntr_recov(MNTR_recov);
 
         //xTaskNotify(TaskHandle_sensors, 0, eNoAction);
 

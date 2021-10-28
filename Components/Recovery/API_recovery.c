@@ -209,10 +209,12 @@ void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command)
  * @brief       get the recovery status
  * 
  * @param       monitoring 
+ * @return      true    new status received
+ * @return      false   nothing received
  * ************************************************************* **/
-void API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring)
+bool API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring)
 {
-    xQueueReceive(QueueHandle_recov_mntr, monitoring, (TickType_t)0);
+    return (xQueueReceive(QueueHandle_recov_mntr, monitoring, (TickType_t)0)) ? true : false;
 }
 
 /* ------------------------------------------------------------- --

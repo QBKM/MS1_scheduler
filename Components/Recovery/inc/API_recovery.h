@@ -16,6 +16,7 @@
    includes
 -- ------------------------------------------------------------- */
 #include "stdint.h"
+#include "stdbool.h"
 
 /* ------------------------------------------------------------- --
    types
@@ -56,7 +57,7 @@ typedef STRUCT_RECOV_t STRUCT_RECOV_MNTR_t;
 -- ------------------------------------------------------------- */
 void API_RECOVERY_START(uint32_t priority);
 void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command);
-void API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring);
+bool API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring);
 void API_RECOVERY_CALLBACK(void);
 
 /* ------------------------------------------------------------- --
