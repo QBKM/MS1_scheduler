@@ -13,6 +13,11 @@
 #define RECOVERY_INC_API_RECOVERY_H_
 
 /* ------------------------------------------------------------- --
+   includes
+-- ------------------------------------------------------------- */
+#include "stdint.h"
+
+/* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
 /* List of commands available for this API. 
@@ -29,8 +34,9 @@ typedef enum
 /* ------------------------------------------------------------- --
    function propotypes
 -- ------------------------------------------------------------- */
-void API_RECOVERY_START(void);
+void API_RECOVERY_START(uint32_t priority);
 void API_RECOVERY_SEND_CMD(ENUM_CMD_ID_t cmd);
+void API_RECOVERY_CALLBACK(void);
 
 /* ------------------------------------------------------------- --
    end of file
