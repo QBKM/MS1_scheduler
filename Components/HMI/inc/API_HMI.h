@@ -26,6 +26,8 @@
 /* application IDs */
 #define HMI_ID_APP_PHASE            (uint8_t)0x10
 #define HMI_ID_APP_AEROC            (uint8_t)0x11
+#define HMI_ID_APP_WINDOW           (uint8_t)0x12
+#define HMI_ID_APP_RECOV_TO         (uint8_t)0x13
 
 /* sensor IDs */
 #define HMI_ID_SENS_IMU_AX          (uint8_t)0x20
@@ -51,31 +53,12 @@
 -- ------------------------------------------------------------- */
 /* The id is use by the API to identify which type of data is sent */
 typedef uint8_t TYPE_HMI_ID_t;
-typedef uint8_t TYPE_HMI_LENGTH_t;
-
-typedef union 
-{
-    uint8_t* txt;
-    uint8_t  u8;
-    uint16_t u16;
-    uint32_t u32;
-    float    f32;
-}UNION_HMI_DATA_t;
-
-typedef enum 
-{
-    E_HMI_TEXT,
-    E_HMI_UINT8,
-    E_HMI_UINT16,
-    E_HMI_UINT32,
-    E_HMI_FLOAT,
-}ENUM_HMI_DATA_TYPE_t;
 
 /* ------------------------------------------------------------- --
    function prototypes
 -- ------------------------------------------------------------- */
-void API_HMI_START(void);
-void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...);
+void API_HMI_START(uint32_t priority);
+void API_HMI_SEND_DATA(TYPE_HMI_ID_t dataID, const char *fmt, ...);
 
 /* ------------------------------------------------------------- --
    end of file

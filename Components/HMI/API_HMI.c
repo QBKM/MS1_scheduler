@@ -30,17 +30,6 @@
 #define HMI_DEFAULT_HEADER          "[%d]"
 
 /* ------------------------------------------------------------- --
-   types
--- ------------------------------------------------------------- */
-typedef struct
-{
-    TYPE_HMI_ID_t ID;           /* store the ID */
-    TYPE_HMI_LENGTH_t lenght;   /* length of string */
-    ENUM_HMI_DATA_TYPE_t type;  /* type of data */
-    UNION_HMI_DATA_t data;       /* store the data */
-}STRUCT_DATA_HANDLER_t;
-
-/* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_hmi;
@@ -59,23 +48,28 @@ static void handler_hmi(void* parameters);
    tasks functions
 == ============================================================= */
 /** ************************************************************* *
- * @brief       
+ * @brief       This task manage the hmi system with one 
+ *              parameters. 
+ *              - The data buffer
+ *              The task need to receive buffer from queue to 
+ *              operate.
  * 
  * @param       parameters 
  * ************************************************************* **/
 static void handler_hmi(void* parameters)
 {
-	char buffer[32];
+	char buffer[HMI_DEFAULT_BUFFER_SIZE];
 
     while(1)
     {
-        memset(buffer, 0, sizeof(buffer));
-
         /* wait until receiving something */
         xQueueReceive(QueueHandle_hmi, buffer, portMAX_DELAY);
 
         /* send data on UART */
         HAL_UART_Transmit(&huart4, (uint8_t*)buffer, strlen(buffer), HMI_DEFAULT_UART_TIMEOUT);
+
+        /* wait the next tick to send another message */
+        vTaskDelay(1);
     }
 }
 
@@ -86,23 +80,24 @@ static void handler_hmi(void* parameters)
  * @brief       init and start the HMI task
  * 
  * ************************************************************* **/
-void API_HMI_START(void)
+void API_HMI_START(uint32_t priority)
 {
     BaseType_t status;
 
     /* create the queue */
-    QueueHandle_hmi = xQueueCreate (HMI_DEFAULT_QUEUE_SIZE, HMI_DEFAULT_BUFFER_SIZE);
+    QueueHandle_hmi = xQueueCreate(HMI_DEFAULT_QUEUE_SIZE, HMI_DEFAULT_BUFFER_SIZE);
     
     /* create the task */
-    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_hmi);
+    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_hmi);
     configASSERT(status == pdPASS);
 }
 
 /** ************************************************************* *
- * @brief       
+ * @brief       send data to the hmi uart with the ID as header.
+ *              total buffer must be smaller than 32 bytes.
  * 
  * @param       dataID 
- * @param       fmt 
+ * @param       fmt
  * @param       ... 
  * ************************************************************* **/
 void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...)
@@ -110,7 +105,11 @@ void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...)
     char buffer[32];
     va_list args;
     va_start(args, fmt);
+
+    /* add the header to the buffer */
     sprintf(buffer, HMI_DEFAULT_HEADER, dataID);
+    
+    /* add payload to the buffer */
     vsprintf(buffer + strlen(buffer), fmt, args);
     va_end(args);
 
