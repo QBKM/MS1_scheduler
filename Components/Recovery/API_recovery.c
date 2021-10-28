@@ -37,7 +37,7 @@ QueueHandle_t QueueHandle_recov_mntr;
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
-static STRUCT_recovery_t recovery = {0};
+static STRUCT_RECOV_t recovery = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
@@ -61,7 +61,7 @@ static void handler_recovery(void* parameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
-    ENUM_CMD_ID_t cmd = E_CMD_NONE;
+    ENUM_RECOV_CMD_t cmd = E_CMD_NONE;
 
     while(1)
     {
@@ -159,7 +159,7 @@ static void handler_recovery(void* parameters)
         }
 
         /* update monitoring queue */
-        xQueueSend(QueueHandle_recov_mntr, &recovery, 0);
+        xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
 
         /* wait until next task period */
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
@@ -187,8 +187,8 @@ void API_RECOVERY_START(uint32_t priority)
     TIM4->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
 
     /* create the queues */
-    QueueHandle_recov_cmd = xQueueCreate(1, sizeof(ENUM_CMD_ID_t));
-    QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_recovery_t));
+    QueueHandle_recov_cmd = xQueueCreate(1, sizeof(ENUM_RECOV_CMD_t));
+    QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_RECOV_MNTR_t));
     
     /* create the task */
     status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_recovery);
@@ -200,9 +200,9 @@ void API_RECOVERY_START(uint32_t priority)
  * 
  * @param       cmd 
  * ************************************************************* **/
-void API_RECOVERY_SEND_CMD(ENUM_CMD_ID_t cmd)
+void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command)
 {
-    xQueueSend(QueueHandle_recov_cmd, &cmd, 0);
+    xQueueSend(QueueHandle_recov_cmd, &command, (TickType_t)0);
 }
 
 /** ************************************************************* *
@@ -210,7 +210,7 @@ void API_RECOVERY_SEND_CMD(ENUM_CMD_ID_t cmd)
  * 
  * @param       monitoring 
  * ************************************************************* **/
-void API_RECOVERY_GET_MNTR(STRUCT_recovery_t* monitoring)
+void API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring)
 {
     xQueueReceive(QueueHandle_recov_mntr, monitoring, (TickType_t)0);
 }
