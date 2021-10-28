@@ -28,35 +28,16 @@
 #define RECOVERY_DEFAULT_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
 
 /* ------------------------------------------------------------- --
-   types
--- ------------------------------------------------------------- */
-/* List of system status */
-typedef enum
-{
-    E_STATUS_NONE,          /* default state */
-    E_STATUS_STOP,          /* state when the system is stop */
-    E_STATUS_RUNNING,       /* state when the system is running */
-    E_STATUS_OPEN,          /* state when the system is opened */
-    E_STATUS_CLOSE          /* state when the system is closed */
-}ENUM_RECOVERY_STATUS_t;
-
-/* main structure */
-typedef struct
-{
-    ENUM_CMD_ID_t last_cmd;             /* last command running */
-    ENUM_RECOVERY_STATUS_t status;      /* current status of the system */
-}STRUCT_recovery_t;
-
-/* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_recovery;
-QueueHandle_t QueueHandle_recovery;
+QueueHandle_t QueueHandle_recov_cmd;
+QueueHandle_t QueueHandle_recov_mntr;
 
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
-static STRUCT_recovery_t recovery = {0};
+static STRUCT_RECOV_t recovery = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
@@ -80,12 +61,12 @@ static void handler_recovery(void* parameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
-    ENUM_CMD_ID_t cmd = E_CMD_NONE;
+    ENUM_RECOV_CMD_t cmd = E_CMD_NONE;
 
     while(1)
     {
         /* check for new command */
-        if(xQueueReceive(QueueHandle_recovery, &cmd, (TickType_t)0))
+        if(xQueueReceive(QueueHandle_recov_cmd, &cmd, (TickType_t)0))
         {
             switch(cmd)
             {
@@ -144,8 +125,8 @@ static void handler_recovery(void* parameters)
         }
 
         /* check if the system as reach the open point */
-        if(HAL_GPIO_ReadPin(END11_GPIO_Port, END11_Pin) == GPIO_PIN_SET
-        || HAL_GPIO_ReadPin(END12_GPIO_Port, END12_Pin) == GPIO_PIN_SET)
+        if(HAL_GPIO_ReadPin(END11_GPIO_Port, END11_Pin) == GPIO_PIN_RESET
+        || HAL_GPIO_ReadPin(END12_GPIO_Port, END12_Pin) == GPIO_PIN_RESET)
         {
             /* diasable the motors */
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
@@ -154,14 +135,15 @@ static void handler_recovery(void* parameters)
             /* disable the pwm */
             HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
             HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
+            HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
 
             /* update system structure */
             recovery.status = E_STATUS_OPEN;
         }
 
         /* check if the system as reach the open or close point */
-        if(HAL_GPIO_ReadPin(END12_GPIO_Port, END21_Pin) == GPIO_PIN_SET
-        || HAL_GPIO_ReadPin(END12_GPIO_Port, END22_Pin) == GPIO_PIN_SET)
+        if(HAL_GPIO_ReadPin(END12_GPIO_Port, END21_Pin) == GPIO_PIN_RESET
+        || HAL_GPIO_ReadPin(END12_GPIO_Port, END22_Pin) == GPIO_PIN_RESET)
         {
             /* diasable the motors */
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
@@ -170,13 +152,17 @@ static void handler_recovery(void* parameters)
             /* disable the pwm*/
             HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
             HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
+            HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
             
             /* update system structure */
              recovery.status = E_STATUS_CLOSE;
         }
 
+        /* update monitoring queue */
+        xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
+
         /* wait until next task period */
-        vTaskDelayUntil(xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
     }
 }
 
@@ -187,7 +173,7 @@ static void handler_recovery(void* parameters)
  * @brief       init and start the recovery task
  * 
  * ************************************************************* **/
-void API_RECOVERY_START(void)
+void API_RECOVERY_START(uint32_t priority)
 {
     BaseType_t status;
 
@@ -196,14 +182,16 @@ void API_RECOVERY_START(void)
     recovery.status     = E_STATUS_NONE;
 
     /* init the motors pwm dutycycle */
-    htim2.Instance->CCR2 = RECOVERY_DEFAULT_CCR2_M1;
-    htim3.Instance->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
+    TIM2->CCR2 = RECOVERY_DEFAULT_CCR2_M1;
+    TIM3->CCR3 = RECOVERY_DEFAULT_CCR2_M2;
+    TIM4->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
 
-    /* create the queue */
-    QueueHandle_recovery = xQueueCreate(1, sizeof(ENUM_CMD_ID_t));
+    /* create the queues */
+    QueueHandle_recov_cmd = xQueueCreate(1, sizeof(ENUM_RECOV_CMD_t));
+    QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_RECOV_MNTR_t));
     
     /* create the task */
-    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_recovery);
+    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_recovery);
     configASSERT(status == pdPASS);
 }
 
@@ -212,9 +200,21 @@ void API_RECOVERY_START(void)
  * 
  * @param       cmd 
  * ************************************************************* **/
-void API_RECOVERY_SEND_CMD(ENUM_CMD_ID_t cmd)
+void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command)
 {
-    xQueueSend(QueueHandle_recovery, &cmd, 0);
+    xQueueSend(QueueHandle_recov_cmd, &command, (TickType_t)0);
+}
+
+/** ************************************************************* *
+ * @brief       get the recovery status
+ * 
+ * @param       monitoring 
+ * @return      true    new status received
+ * @return      false   nothing received
+ * ************************************************************* **/
+bool API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring)
+{
+    return (xQueueReceive(QueueHandle_recov_mntr, monitoring, (TickType_t)0)) ? true : false;
 }
 
 /* ------------------------------------------------------------- --

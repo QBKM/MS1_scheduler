@@ -24,7 +24,7 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define BATTERY_DEFAULT_PERIOD_TASK         1000u    /* [ms] */
+#define BATTERY_DEFAULT_PERIOD_TASK         1000u   /* [ms] */
 #define BATTERY_DEFAULT_MAX_VOLTAGE         18u     /* [volt] */
 #define BATTERY_DEFAULT_ADC_RANGE           1024u
 #define BATTERY_DEFAULT_THRESHOLD_VOLTAGE   7.5f    /* [volt] */
@@ -56,6 +56,8 @@ QueueHandle_t QueueHandle_battery;
 static void handler_battery(void* parameters);
 static float convert_adc_volt(uint32_t raw_adc);
 static float convert_adc_current(uint32_t raw_adc);
+static ENUM_BATTERY_STATUS_t update_status(TYPE_BATTERY_VOLTAGE_t volt);
+static ENUM_BATTERY_STATUS_t update_status_overall(STRUCT_BATTERY_t allBatteryStruct);
 
 /* ============================================================= ==
    tasks functions
@@ -86,16 +88,16 @@ static void handler_battery(void* parameters)
         DATA.BAT_MOTOR2.current = convert_adc_current(adc_result[BATTERY_DEFAULT_ADC_IBAT_MOTOR_2]);
 
         /* update batteries status */
-        (DATA.BAT_SEQ.volt    < BATTERY_DEFAULT_THRESHOLD_VOLTAGE) ? DATA.BAT_SEQ.status    = E_BATTERY_KO : E_BATTERY_OK;
-        (DATA.BAT_MOTOR1.volt < BATTERY_DEFAULT_THRESHOLD_VOLTAGE) ? DATA.BAT_MOTOR1.status = E_BATTERY_KO : E_BATTERY_OK;
-        (DATA.BAT_MOTOR2.volt < BATTERY_DEFAULT_THRESHOLD_VOLTAGE) ? DATA.BAT_MOTOR2.status = E_BATTERY_KO : E_BATTERY_OK;
-        ((DATA.BAT_SEQ.status || DATA.BAT_MOTOR1.status || DATA.BAT_MOTOR2.status) == E_BATTERY_KO) ? DATA.STATUS = E_BATTERY_KO : E_BATTERY_OK;
+        DATA.BAT_SEQ.status    = update_status(DATA.BAT_SEQ.volt);
+        DATA.BAT_MOTOR1.status = update_status(DATA.BAT_MOTOR1.volt);
+        DATA.BAT_MOTOR2.status = update_status(DATA.BAT_MOTOR2.volt);
+        DATA.STATUS            = update_status_overall(DATA);
 
         /* send the data to the queue */
         xQueueSend(QueueHandle_battery, &DATA, 0);
 
         /* wait until next task period */
-        vTaskDelayUntil(xLastWakeTime, pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK));
     }
 }
 
@@ -118,9 +120,55 @@ static float convert_adc_volt(uint32_t raw_adc)
  * ************************************************************* **/
 static float convert_adc_current(uint32_t raw_adc)
 {
+    // TODO
 	return 0;
 }
 
+/** ************************************************************* *
+ * @brief       update the status of a battery
+ * 
+ * @param       volt 
+ * @return      ENUM_BATTERY_STATUS_t 
+ * ************************************************************* **/
+static ENUM_BATTERY_STATUS_t update_status(TYPE_BATTERY_VOLTAGE_t volt)
+{
+	ENUM_BATTERY_STATUS_t result;
+
+	if(volt < BATTERY_DEFAULT_THRESHOLD_VOLTAGE)
+    {
+    	result = E_BATTERY_KO;
+    }
+    else
+    {
+    	result = E_BATTERY_OK;
+    }
+
+    return result;
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       allBatteryStruct 
+ * @return      ENUM_BATTERY_STATUS_t 
+ * ************************************************************* **/
+static ENUM_BATTERY_STATUS_t update_status_overall(STRUCT_BATTERY_t mainStruct)
+{
+	ENUM_BATTERY_STATUS_t result;
+
+	if((mainStruct.BAT_SEQ.status    == E_BATTERY_KO)
+	|| (mainStruct.BAT_MOTOR1.status == E_BATTERY_KO)
+	|| (mainStruct.BAT_MOTOR2.status == E_BATTERY_KO))
+	{
+		result = E_BATTERY_KO;
+	}
+	else
+	{
+		result = E_BATTERY_OK;
+	}
+
+	return result;
+}
 
 /* ============================================================= ==
    public functions
@@ -129,7 +177,7 @@ static float convert_adc_current(uint32_t raw_adc)
  * @brief       init and start the battery task
  * 
  * ************************************************************* **/
-void API_BATTERY_START(void)
+void API_BATTERY_START(uint32_t priority)
 {
     BaseType_t status;
 
@@ -137,7 +185,7 @@ void API_BATTERY_START(void)
     QueueHandle_battery = xQueueCreate(1, sizeof(STRUCT_BATTERY_t));
 
     /* create the task */
-    status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_battery);
+    status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_battery);
     configASSERT(status == pdPASS);
 }
 

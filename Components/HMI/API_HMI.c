@@ -1,82 +1,75 @@
 /** ************************************************************* *
- * @file        API_buzzer.c
+ * @file        API_HMI.c
  * @brief       
  * 
- * @date        2021-08-16
+ * @date        2021-10-16
  * @author      Quentin Bakrim (quentin.bakrim@hotmail.fr)
  * 
  * Mines Space
  * 
  * ************************************************************* **/
 
-
 /* ------------------------------------------------------------- --
    include
 -- ------------------------------------------------------------- */
-#include "API_buzzer.h"
+#include "API_HMI.h"
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "task.h"
-#include "gpio.h"
+#include "string.h"
+#include "stdio.h"
+#include "stdarg.h"
+#include "usart.h"
 
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define BUZZER_DEFAULT_PERIOD       1000u
-#define BUZZER_DEFAULT_DUTYCYCLE    0.015f
-
-/* ------------------------------------------------------------- --
-   types
--- ------------------------------------------------------------- */
-/* Buzzer config structure */
-typedef struct
-{
-    uint16_t    period;
-    float       dutycycle;
-}STRUCT_BUZZER_t;
+#define HMI_DEFAULT_QUEUE_SIZE      10u 
+#define HMI_DEFAULT_BUFFER_SIZE     32u
+#define HMI_DEFAULT_UART_TIMEOUT    1u
+#define HMI_DEFAULT_HEADER          "[%d]"
 
 /* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
-TaskHandle_t TaskHandle_buzzer;
-QueueHandle_t QueueHandle_buzzer;
+TaskHandle_t TaskHandle_hmi;
+QueueHandle_t QueueHandle_hmi;
 
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
-static STRUCT_BUZZER_t buzzer = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
-static void handler_buzzer(void* parameters);
+static void handler_hmi(void* parameters);
 
 /* ============================================================= ==
    tasks functions
 == ============================================================= */
 /** ************************************************************* *
- * @brief       This task manage the buzzer system with two 
+ * @brief       This task manage the hmi system with one 
  *              parameters. 
- *              - The period
- *              - The dutycycle
- *              The task need to receive command from queue to 
+ *              - The data buffer
+ *              The task need to receive buffer from queue to 
  *              operate.
- *              Please check at the STRUCT_BUZZER_t structure
- *              to send new parameters
  * 
  * @param       parameters 
  * ************************************************************* **/
-static void handler_buzzer(void* parameters)
+static void handler_hmi(void* parameters)
 {
+	char buffer[HMI_DEFAULT_BUFFER_SIZE];
+
     while(1)
     {
-        /* (alpha) part of dutycycle */
-        HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-        xQueueReceive(QueueHandle_buzzer, &buzzer, pdMS_TO_TICKS(buzzer.period * buzzer.dutycycle));
+        /* wait until receiving something */
+        xQueueReceive(QueueHandle_hmi, buffer, portMAX_DELAY);
 
-        /* (1 - alpha) part of dutycycle */
-        HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-        xQueueReceive(QueueHandle_buzzer, &buzzer, pdMS_TO_TICKS(buzzer.period - buzzer.period * buzzer.dutycycle));
+        /* send data on UART */
+        HAL_UART_Transmit(&huart4, (uint8_t*)buffer, strlen(buffer), HMI_DEFAULT_UART_TIMEOUT);
+
+        /* wait the next tick to send another message */
+        vTaskDelay(1);
     }
 }
 
@@ -84,35 +77,44 @@ static void handler_buzzer(void* parameters)
    public functions
 == ============================================================= */
 /** ************************************************************* *
- * @brief       init and start the buzzer task
+ * @brief       init and start the HMI task
  * 
  * ************************************************************* **/
-void API_BUZZER_START(uint32_t priority)
+void API_HMI_START(uint32_t priority)
 {
     BaseType_t status;
 
-    /* init the main structure */
-    buzzer.period    = BUZZER_DEFAULT_PERIOD;
-    buzzer.dutycycle = BUZZER_DEFAULT_DUTYCYCLE;
-
     /* create the queue */
-    QueueHandle_buzzer = xQueueCreate (1, sizeof(STRUCT_BUZZER_t));
+    QueueHandle_hmi = xQueueCreate(HMI_DEFAULT_QUEUE_SIZE, HMI_DEFAULT_BUFFER_SIZE);
     
     /* create the task */
-    status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_buzzer);
+    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_hmi);
     configASSERT(status == pdPASS);
 }
 
 /** ************************************************************* *
- * @brief       send new parameters to the buzzer task
+ * @brief       send data to the hmi uart with the ID as header.
+ *              total buffer must be smaller than 32 bytes.
  * 
- * @param       period 
- * @param       dutycycle 
+ * @param       dataID 
+ * @param       fmt
+ * @param       ... 
  * ************************************************************* **/
-void API_BUZZER_SEND_PARAMETER(uint16_t period, float dutycycle)
+void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...)
 {
-    STRUCT_BUZZER_t param = {.dutycycle = dutycycle, .period = period};
-    xQueueSend(QueueHandle_buzzer, &param, 0);
+    char buffer[32];
+    va_list args;
+    va_start(args, fmt);
+
+    /* add the header to the buffer */
+    sprintf(buffer, HMI_DEFAULT_HEADER, dataID);
+    
+    /* add payload to the buffer */
+    vsprintf(buffer + strlen(buffer), fmt, args);
+    va_end(args);
+
+    /* send to task */
+    xQueueSend(QueueHandle_hmi, buffer, 0);
 }
 
 /* ------------------------------------------------------------- --
