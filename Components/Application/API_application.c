@@ -31,16 +31,21 @@
    defines
 -- ------------------------------------------------------------- */
 /* notify flag IDs */
-#define APPLICATION_DEFAULT_AEROCONTACT_ID 0x08000000
+#define APPLICATION_DEFAULT_AEROCONTACT_ID      0x00000001u
+#define APPLICATION_DEFAULT_WINDOW_IN_IT_ID     0x00000002u
+#define APPLICATION_DEFAULT_WINDOW_OUT_IT_ID    0x00000004u
+#define APPLICATION_DEFAULT_RECOV_TIMEOUT_IT_ID 0x00000008u
 
 /* Buzzer settings */
 #define BUZZER_ASCEND_PERIOD        100u    /* [ms] */
 #define BUZZER_ASCEND_DUTYCYCLE     0.1f    /* ratio */
-#define BUZZER_DESCEND_PERIOD       10u    /* [ms] */
+#define BUZZER_DESCEND_PERIOD       1000u   /* [ms] */
 #define BUZZER_DESCEND_DUTYCYCLE    0.5f    /* ratio */
 
-#define WINDOW_IN_TIME              6000u /* [ms] */
-#define WINDOW_OUT_TIME             2000u /* [ms] */
+#define WINDOW_IN_TIME              6000u   /* [ms] */
+#define WINDOW_OUT_TIME             2000u   /* [ms] */
+
+#define RECOVERY_TIMEOUT            10000u  /* [ms] */
 
 /* ------------------------------------------------------------- --
    types
@@ -57,6 +62,7 @@ typedef struct
 TaskHandle_t TaskHandle_application;
 TimerHandle_t TimerHandle_window_in;
 TimerHandle_t TimerHandle_window_out;
+TimerHandle_t TimerHandle_recov_timeout;
 
 /* ------------------------------------------------------------- --
    variables
@@ -70,6 +76,8 @@ static ENUM_PHASE_t phase;
 static void handler_application(void* parameters);
 static void notify_check(void);
 static void callback_timer_window_in(TimerHandle_t xTimer);
+static void callback_timer_window_out(TimerHandle_t xTimer);
+static void callback_timer_recov_timeout(TimerHandle_t xTimer);
 
 /* ------------------------------------------------------------- --
    functions
@@ -107,6 +115,7 @@ static void handler_application(void* parameters)
         //xqueuesend radio
         //xqueuesend ihm
             //if status == ko => send msg + led
+
         xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
     }
 }
@@ -121,35 +130,88 @@ static void notify_check(void)
 
     if(xTaskNotifyWait(0,0, &notify_id, 0) == pdTRUE)
     {
-        /* check aerocontact */
+        /* check aerocontact if the rocket has launched */
         if(notify_id & APPLICATION_DEFAULT_AEROCONTACT_ID)
         {
-            phase = E_PHASE_ASCEND;
-            API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
-            API_HMI_SEND_DATA(HMI_ID_APP_AEROC, "start");
-            //UNION_HMI_DATA_t test.u8 = 123;
-            API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "Phase : ascend %d\n", 13);
+            static bool trigger_aero = false;
+            if(trigger_aero == false)
+            {
+                trigger_aero = true;
+                phase = E_PHASE_ASCEND;
+                aerocontact.flag = true;
+                aerocontact.triggerDate = xTaskGetTickCount();
 
-            //xTimerStart(TimerHandle_window_in, 0);
+                /* user indicators */
+                API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
+                API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "ascend");
+
+                /* start the window in counter */
+                xTimerStart(TimerHandle_window_in, 0);
+            }
+        }
+
+        /* check timer window in */
+        if(notify_id & APPLICATION_DEFAULT_WINDOW_IN_IT_ID)
+        {
+            static bool trigger_win = false;
+            if(trigger_win == false)
+            {
+                trigger_win = true;
+
+                API_HMI_SEND_DATA(HMI_ID_APP_WINDOW, "in");
+
+                /* start the window out counter */
+                xTimerStart(TimerHandle_window_out, 0);
+            }
+        }
+
+        /* check timer window out */
+        if(notify_id & APPLICATION_DEFAULT_WINDOW_OUT_IT_ID)
+        {
+            /* force the recovery if not deployed before */
+            if(phase == E_PHASE_ASCEND)
+            {
+                phase = E_PHASE_DESCEND;
+
+                /* data to hmi */
+                API_HMI_SEND_DATA(HMI_ID_APP_WINDOW, "out");
+                API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "descend");
+
+                /* update buzzer */
+                API_BUZZER_SEND_PARAMETER(BUZZER_DESCEND_PERIOD, BUZZER_DESCEND_DUTYCYCLE);
+
+                /* force the opening */
+                API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+
+                /* start the window out counter */
+                xTimerStart(TimerHandle_recov_timeout, 0);
+            }
+        }
+
+        /* check timer recovery timeout */
+        if(notify_id & APPLICATION_DEFAULT_RECOV_TIMEOUT_IT_ID)
+        {
+            static bool trigger_recov = false;
+            if(trigger_recov == false)
+            {
+                trigger_recov = true;
+
+                /* force the stop to protect the system */
+                API_RECOVERY_SEND_CMD(E_CMD_STOP);
+
+                /* data to hmi */
+                API_HMI_SEND_DATA(HMI_ID_APP_RECOV_TO, "timeout");
+            }
         }
     }
 }
 
-/** ************************************************************* *
- * @brief       
- * 
- * ************************************************************* **/
-static void callback_timer_window_in(TimerHandle_t xTimer)
-{
-    phase = E_PHASE_DESCEND;
-    API_BUZZER_SEND_PARAMETER(BUZZER_DESCEND_PERIOD, BUZZER_DESCEND_DUTYCYCLE);
-}
 
 /** ************************************************************* *
  * @brief       
  * 
  * ************************************************************* **/
-void API_APPLICATION_START(void)
+void API_APPLICATION_START(uint32_t priority)
 {
     BaseType_t status;
 
@@ -158,26 +220,62 @@ void API_APPLICATION_START(void)
     aerocontact.flag = false;
     aerocontact.triggerDate = 0xFFFFFFFF;
     
-    status = xTaskCreate(handler_application, "task_application", configMINIMAL_STACK_SIZE, NULL, 3, &TaskHandle_application);
+    /* create the task */
+    status = xTaskCreate(handler_application, "task_application", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_application);
     configASSERT(status == pdPASS);
 
-    //TimerHandle_window_in = xTimerCreate("timer_window_in", pdMS_TO_TICKS(WINDOW_IN_TIME), pdFALSE, (void*)0, callback_timer_window_in);
-    //configASSERT(TimerHandle_window_in == NULL);
+    /* init the temporal window timers */
+    TimerHandle_window_in  = xTimerCreate("timer_window_in", pdMS_TO_TICKS(WINDOW_IN_TIME), pdFALSE, (void*)0, callback_timer_window_in);
+    TimerHandle_window_out = xTimerCreate("timer_window_out", pdMS_TO_TICKS(WINDOW_OUT_TIME), pdFALSE, (void*)0, callback_timer_window_out);
+    TimerHandle_recov_timeout = xTimerCreate("timer_recovery_timeout", pdMS_TO_TICKS(RECOVERY_TIMEOUT), pdFALSE, (void*)0, callback_timer_recov_timeout);
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       xTimer 
+ * ************************************************************* **/
+static void callback_timer_window_in(TimerHandle_t xTimer)
+{
+    /* notify the application task with aerocontact ID flag */
+    xTaskNotifyFromISR(TaskHandle_application, APPLICATION_DEFAULT_WINDOW_IN_IT_ID, eSetBits, pdFALSE);
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       xTimer 
+ * ************************************************************* **/
+static void callback_timer_window_out(TimerHandle_t xTimer)
+{
+    /* notify the application task with aerocontact ID flag */
+    xTaskNotifyFromISR(TaskHandle_application, APPLICATION_DEFAULT_WINDOW_OUT_IT_ID, eSetBits, pdFALSE);
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       xTimer 
+ * ************************************************************* **/
+static void callback_timer_recov_timeout(TimerHandle_t xTimer)
+{
+    /* notify the application task with aerocontact ID flag */
+    xTaskNotifyFromISR(TaskHandle_application, APPLICATION_DEFAULT_RECOV_TIMEOUT_IT_ID, eSetBits, pdFALSE);
 }
 
 /** ************************************************************* *
  * @brief       
  * 
  * ************************************************************* **/
-void API_APPLICATION_CALLBACK(void)
+void API_APPLICATION_CALLBACK_ISR(ENUM_APP_ISR_ID_t ID)
 {
-    if(aerocontact.flag == false)
+    if(ID == E_APP_ISR_AEROC)
     {
-        aerocontact.flag = true;
-        aerocontact.triggerDate = xTaskGetTickCountFromISR();
-
-        /* notify the application task with aerocontact ID flag */
-        xTaskNotifyFromISR(TaskHandle_application, APPLICATION_DEFAULT_AEROCONTACT_ID, eSetBits, pdFALSE);
+        if(aerocontact.flag == false)
+        {
+            /* notify the application task with aerocontact ID flag */
+            xTaskNotifyFromISR(TaskHandle_application, APPLICATION_DEFAULT_AEROCONTACT_ID, eSetBits, pdFALSE);
+        }
     }
 }
 
