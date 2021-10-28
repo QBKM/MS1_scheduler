@@ -20,7 +20,7 @@
 /* ------------------------------------------------------------- --
    function prototypes
 -- ------------------------------------------------------------- */
-void API_BUZZER_START(void);
+void API_BUZZER_START(uint32_t priority);
 void API_BUZZER_SEND_PARAMETER(uint16_t period, float dutycycle);
 
 /* ------------------------------------------------------------- --
