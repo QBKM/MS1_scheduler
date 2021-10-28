@@ -91,10 +91,14 @@ static void handler_application(void* parameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
+    static STRUCT_recovery_t MNTR_recov;
+
     while(1)
     {
         /* check task notify */
         notify_check();
+
+        API_RECOVERY_GET_MNTR(&MNTR_recov);
 
         //xTaskNotify(TaskHandle_sensors, 0, eNoAction);
 
@@ -128,7 +132,7 @@ static void notify_check(void)
 {
     uint32_t notify_id;
 
-    if(xTaskNotifyWait(0,0, &notify_id, 0) == pdTRUE)
+    if(xTaskNotifyWait(0xFFFF,0, &notify_id, 0) == pdTRUE)
     {
         /* check aerocontact if the rocket has launched */
         if(notify_id & APPLICATION_DEFAULT_AEROCONTACT_ID)

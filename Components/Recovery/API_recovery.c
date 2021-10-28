@@ -28,30 +28,11 @@
 #define RECOVERY_DEFAULT_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
 
 /* ------------------------------------------------------------- --
-   types
--- ------------------------------------------------------------- */
-/* List of system status */
-typedef enum
-{
-    E_STATUS_NONE,          /* default state */
-    E_STATUS_STOP,          /* state when the system is stop */
-    E_STATUS_RUNNING,       /* state when the system is running */
-    E_STATUS_OPEN,          /* state when the system is opened */
-    E_STATUS_CLOSE          /* state when the system is closed */
-}ENUM_RECOVERY_STATUS_t;
-
-/* main structure */
-typedef struct
-{
-    ENUM_CMD_ID_t last_cmd;             /* last command running */
-    ENUM_RECOVERY_STATUS_t status;      /* current status of the system */
-}STRUCT_recovery_t;
-
-/* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_recovery;
-QueueHandle_t QueueHandle_recovery;
+QueueHandle_t QueueHandle_recov_cmd;
+QueueHandle_t QueueHandle_recov_mntr;
 
 /* ------------------------------------------------------------- --
    variables
@@ -85,7 +66,7 @@ static void handler_recovery(void* parameters)
     while(1)
     {
         /* check for new command */
-        if(xQueueReceive(QueueHandle_recovery, &cmd, (TickType_t)0))
+        if(xQueueReceive(QueueHandle_recov_cmd, &cmd, (TickType_t)0))
         {
             switch(cmd)
             {
@@ -177,6 +158,9 @@ static void handler_recovery(void* parameters)
              recovery.status = E_STATUS_CLOSE;
         }
 
+        /* update monitoring queue */
+        xQueueSend(QueueHandle_recov_mntr, &recovery, 0);
+
         /* wait until next task period */
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
     }
@@ -202,8 +186,9 @@ void API_RECOVERY_START(uint32_t priority)
     TIM3->CCR3 = RECOVERY_DEFAULT_CCR2_M2;
     TIM4->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
 
-    /* create the queue */
-    QueueHandle_recovery = xQueueCreate(1, sizeof(ENUM_CMD_ID_t));
+    /* create the queues */
+    QueueHandle_recov_cmd = xQueueCreate(1, sizeof(ENUM_CMD_ID_t));
+    QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_recovery_t));
     
     /* create the task */
     status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_recovery);
@@ -217,7 +202,17 @@ void API_RECOVERY_START(uint32_t priority)
  * ************************************************************* **/
 void API_RECOVERY_SEND_CMD(ENUM_CMD_ID_t cmd)
 {
-    xQueueSend(QueueHandle_recovery, &cmd, 0);
+    xQueueSend(QueueHandle_recov_cmd, &cmd, 0);
+}
+
+/** ************************************************************* *
+ * @brief       get the recovery status
+ * 
+ * @param       monitoring 
+ * ************************************************************* **/
+void API_RECOVERY_GET_MNTR(STRUCT_recovery_t* monitoring)
+{
+    xQueueReceive(QueueHandle_recov_mntr, monitoring, (TickType_t)0);
 }
 
 /* ------------------------------------------------------------- --
