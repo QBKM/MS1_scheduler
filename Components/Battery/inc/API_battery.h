@@ -53,7 +53,7 @@ typedef struct
 /* ------------------------------------------------------------- --
    function prototypes
 -- ------------------------------------------------------------- */
-void API_BATTERY_START(void);
+void API_BATTERY_START(uint32_t priority);
 void API_BATTERY_GET(STRUCT_BATTERY_t* dataStruct);
 
 /* ------------------------------------------------------------- --
