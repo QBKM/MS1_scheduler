@@ -16,6 +16,7 @@
    includes
 -- ------------------------------------------------------------- */
 #include "stdint.h"
+#include "stdbool.h"
 
 /* ------------------------------------------------------------- --
    types
@@ -50,11 +51,14 @@ typedef struct
     STRUCT_BATTERY_DATA_t BAT_MOTOR2;
 }STRUCT_BATTERY_t;
 
+/* monitoring structure */
+typedef STRUCT_BATTERY_t STRUCT_BATTERY_MNTR_t;
+
 /* ------------------------------------------------------------- --
    function prototypes
 -- ------------------------------------------------------------- */
 void API_BATTERY_START(uint32_t priority);
-void API_BATTERY_GET(STRUCT_BATTERY_t* dataStruct);
+bool API_BATTERY_GET_MNTR(STRUCT_BATTERY_MNTR_t* monitoring);
 
 /* ------------------------------------------------------------- --
    end of file
