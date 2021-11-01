@@ -23,6 +23,7 @@
 #include "API_recovery.h"
 #include "API_buzzer.h"
 #include "API_HMI.h"
+#include "API_battery.h"
 
 #include "SEGGER_SYSVIEW.h"
 //#include "config.h"
@@ -74,7 +75,15 @@ static ENUM_PHASE_t phase;
    prototypes
 -- ------------------------------------------------------------- */
 static void handler_application(void* parameters);
+
+/* notifications */
 static void notify_check(void);
+
+/* monitoring */
+static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV);
+static void process_mntr_battery(STRUCT_BATTERY_MNTR_t MNTR_battery);
+
+/* callbacks */
 static void callback_timer_window_in(TimerHandle_t xTimer);
 static void callback_timer_window_out(TimerHandle_t xTimer);
 static void callback_timer_recov_timeout(TimerHandle_t xTimer);
@@ -92,13 +101,23 @@ static void handler_application(void* parameters)
     xLastWakeTime = xTaskGetTickCount();
 
     STRUCT_RECOV_MNTR_t MNTR_recov;
+    STRUCT_BATTERY_MNTR_t MNTR_battery;
 
     while(1)
     {
         /* check task notify */
         notify_check();
 
-        if(API_RECOVERY_GET_MNTR(&MNTR_recov)); // process_mntr_recov(MNTR_recov);
+        /* check task monitoring */
+        if(API_RECOVERY_GET_MNTR(&MNTR_recov)) process_mntr_recov(MNTR_recov);
+        if(API_BATTERY_GET_MNTR(&MNTR_battery)) process_mntr_battery(MNTR_battery);
+
+        /* check task data */
+        //if(API_XXXX_GET_DATA(&DATA_xxxx)) process_data_xxxx(DATA_xxxx);
+        //if(API_XXXX_GET_DATA(&DATA_xxxx)) process_data_xxxx(DATA_xxxx);
+        //...
+
+
 
         //xTaskNotify(TaskHandle_sensors, 0, eNoAction);
 
@@ -147,7 +166,7 @@ static void notify_check(void)
 
                 /* user indicators */
                 API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
-                API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "ascend");
+                API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "a");
 
                 /* start the window in counter */
                 xTimerStart(TimerHandle_window_in, 0);
@@ -162,7 +181,7 @@ static void notify_check(void)
             {
                 trigger_win = true;
 
-                API_HMI_SEND_DATA(HMI_ID_APP_WINDOW, "in");
+                API_HMI_SEND_DATA(HMI_ID_APP_WINDOW, "i");
 
                 /* start the window out counter */
                 xTimerStart(TimerHandle_window_out, 0);
@@ -178,8 +197,8 @@ static void notify_check(void)
                 phase = E_PHASE_DESCEND;
 
                 /* data to hmi */
-                API_HMI_SEND_DATA(HMI_ID_APP_WINDOW, "out");
-                API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "descend");
+                API_HMI_SEND_DATA(HMI_ID_APP_WINDOW, "o");
+                API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "d");
 
                 /* update buzzer */
                 API_BUZZER_SEND_PARAMETER(BUZZER_DESCEND_PERIOD, BUZZER_DESCEND_DUTYCYCLE);
@@ -204,12 +223,119 @@ static void notify_check(void)
                 API_RECOVERY_SEND_CMD(E_CMD_STOP);
 
                 /* data to hmi */
-                API_HMI_SEND_DATA(HMI_ID_APP_RECOV_TO, "timeout");
+                API_HMI_SEND_DATA(HMI_ID_APP_RECOV_TO, "t");
             }
         }
     }
 }
 
+/** ************************************************************* *
+ * @brief       process the recovery monitoring to send over HMI
+ * 
+ * @param       MNTR_RECOV 
+ * ************************************************************* **/
+static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV)
+{
+    /* send to hmi the last cmd received by the recovery */
+    switch(MNTR_RECOV.last_cmd)
+    {
+        case E_CMD_NONE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "n");
+            break;
+
+        case E_CMD_STOP:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "s");
+            break;
+
+        case E_CMD_OPEN:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "o");
+            break;
+
+        case E_CMD_CLOSE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "c");
+            break;
+        
+        default:
+            break;
+    }
+
+    /* send to hmi the status of the recovery */
+    switch(MNTR_RECOV.status)
+    {
+        case E_STATUS_NONE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "n");
+            break;
+
+        case E_STATUS_STOP:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "s");
+            break;
+
+        case E_STATUS_RUNNING:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "r");
+            break;
+
+        case E_STATUS_OPEN:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "o");
+            break;
+
+        case E_STATUS_CLOSE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "c");
+            break;
+        
+        default:
+            break;
+    }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       MNTR_battery 
+ * ************************************************************* **/
+static void process_mntr_battery(STRUCT_BATTERY_MNTR_t MNTR_battery)
+{
+    /* check if the global status is OK and send to the hmi */
+    if(MNTR_battery.STATUS == E_BATTERY_OK)
+    {
+        API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_SEQ, "o");
+        API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_MOTOR1, "o");
+        API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_MOTOR2, "o");
+    }
+
+    /* if the status is KO, thats mean at least one battery is KO */
+    else
+    {
+        /* check status SEQ */
+        if(MNTR_battery.BAT_SEQ.status == E_BATTERY_KO)
+        {
+            API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_SEQ, "k");
+        }
+        else
+        {
+            API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_SEQ, "o");
+        }
+
+        /* check status MOTOR1 */
+        if(MNTR_battery.BAT_MOTOR1.status == E_BATTERY_KO)
+        {
+            API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_MOTOR1, "k");
+        }
+        else
+        {
+            API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_MOTOR1, "o");
+        }
+
+        /* check status MOTOR2 */
+        if(MNTR_battery.BAT_MOTOR2.status == E_BATTERY_KO)
+        {
+            API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_MOTOR2, "k");
+        }
+        else
+        {
+            API_HMI_SEND_DATA(HMI_ID_MONIT_BAT_MOTOR2, "o");
+        }
+    }
+}
 
 /** ************************************************************* *
  * @brief       
