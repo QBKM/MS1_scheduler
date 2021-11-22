@@ -45,7 +45,7 @@ typedef enum
 /* main structure */
 typedef struct
 {
-    ENUM_RECOV_CMD_t last_cmd;             /* last command running */
+    ENUM_RECOV_CMD_t last_cmd;       /* last command running */
     ENUM_RECOV_STATUS_t status;      /* current status of the system */
 }STRUCT_RECOV_t;
 

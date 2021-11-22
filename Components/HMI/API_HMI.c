@@ -24,8 +24,8 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define HMI_DEFAULT_QUEUE_SIZE      10u 
-#define HMI_DEFAULT_BUFFER_SIZE     32u
+#define HMI_DEFAULT_QUEUE_SIZE      32u 
+#define HMI_DEFAULT_BUFFER_SIZE     16u
 #define HMI_DEFAULT_UART_TIMEOUT    1u
 #define HMI_DEFAULT_HEADER          "[%d]"
 
@@ -69,7 +69,7 @@ static void handler_hmi(void* parameters)
         HAL_UART_Transmit(&huart4, (uint8_t*)buffer, strlen(buffer), HMI_DEFAULT_UART_TIMEOUT);
 
         /* wait the next tick to send another message */
-        vTaskDelay(1);
+        //vTaskDelay(1);
     }
 }
 
@@ -120,3 +120,4 @@ void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...)
 /* ------------------------------------------------------------- --
    end of file
 -- ------------------------------------------------------------- */
+

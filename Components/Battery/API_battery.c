@@ -44,7 +44,7 @@
    handles
 -- ------------------------------------------------------------- */
 TaskHandle_t TaskHandle_battery;
-QueueHandle_t QueueHandle_battery;
+QueueHandle_t QueueHandle_battery_mntr;
 
 /* ------------------------------------------------------------- --
    variables
@@ -94,7 +94,7 @@ static void handler_battery(void* parameters)
         DATA.STATUS            = update_status_overall(DATA);
 
         /* send the data to the queue */
-        xQueueSend(QueueHandle_battery, &DATA, 0);
+        xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
 
         /* wait until next task period */
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK));
@@ -182,7 +182,7 @@ void API_BATTERY_START(uint32_t priority)
     BaseType_t status;
 
     /* create the queue */
-    QueueHandle_battery = xQueueCreate(1, sizeof(STRUCT_BATTERY_t));
+    QueueHandle_battery_mntr = xQueueCreate(1, sizeof(STRUCT_BATTERY_t));
 
     /* create the task */
     status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_battery);
@@ -195,9 +195,9 @@ void API_BATTERY_START(uint32_t priority)
  * 
  * @param       dataStruct 
  * ************************************************************* **/
-void API_BATTERY_GET(STRUCT_BATTERY_t* dataStruct)
+bool API_BATTERY_GET_MNTR(STRUCT_BATTERY_MNTR_t* monitoring)
 {
-    xQueueReceive(QueueHandle_battery, &dataStruct, 0);
+    return (xQueueReceive(QueueHandle_battery_mntr, monitoring, (TickType_t)0)) ? true : false;
 }
 
 /* ------------------------------------------------------------- --

@@ -27,7 +27,7 @@
 #define HMI_ID_APP_PHASE            (uint8_t)0x10
 #define HMI_ID_APP_AEROC            (uint8_t)0x11
 #define HMI_ID_APP_WINDOW           (uint8_t)0x12
-#define HMI_ID_APP_RECOV_TO         (uint8_t)0x13
+#define HMI_ID_APP_RECOV_APOGEE     (uint8_t)0x13
 
 /* sensor IDs */
 #define HMI_ID_SENS_IMU_AX          (uint8_t)0x20
@@ -41,12 +41,13 @@
 #define HMI_ID_SENS_BARO_TEMP       (uint8_t)0x28
 
 /* monitoring IDs */
-#define HMI_ID_MONIT_BAT_SEQ_V      (uint8_t)0x30
-#define HMI_ID_MONIT_BAT_SEQ_A      (uint8_t)0x31
-#define HMI_ID_MONIT_BAT_MOTOR1_V   (uint8_t)0x32
-#define HMI_ID_MONIT_BAT_MOTOR1_A   (uint8_t)0x33
-#define HMI_ID_MONIT_BAT_MOTORj2_V  (uint8_t)0x34
-#define HMI_ID_MONIT_BAT_MOTOR2_A   (uint8_t)0x35
+#define HMI_ID_MONIT_BAT_SEQ        (uint8_t)0x30
+#define HMI_ID_MONIT_BAT_MOTOR1     (uint8_t)0x31
+#define HMI_ID_MONIT_BAT_MOTOR2     (uint8_t)0x32
+
+/* recovery IDs */
+#define HMI_ID_RECOV_LAST_CMD       (uint8_t)0x40
+#define HMI_ID_RECOV_STATUS         (uint8_t)0x41
 
 /* ------------------------------------------------------------- --
    types
