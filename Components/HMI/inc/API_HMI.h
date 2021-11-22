@@ -27,7 +27,7 @@
 #define HMI_ID_APP_PHASE            (uint8_t)0x10
 #define HMI_ID_APP_AEROC            (uint8_t)0x11
 #define HMI_ID_APP_WINDOW           (uint8_t)0x12
-#define HMI_ID_APP_RECOV_TO         (uint8_t)0x31
+#define HMI_ID_APP_RECOV_APOGEE     (uint8_t)0x13
 
 /* sensor IDs */
 #define HMI_ID_SENS_IMU_AX          (uint8_t)0x20
