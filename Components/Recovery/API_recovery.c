@@ -23,9 +23,10 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define RECOVERY_DEFAULT_PERIOD_TASK    10u     /* [ms] */ 
+#define RECOVERY_DEFAULT_PERIOD_TASK    100u     /* [ms] */
 #define RECOVERY_DEFAULT_CCR2_M1        3840u   /* 80% PWM (ARR = 4800) */
 #define RECOVERY_DEFAULT_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
+
 
 /* ------------------------------------------------------------- --
    handles
@@ -43,6 +44,9 @@ static STRUCT_RECOV_t recovery = {0};
    prototypes
 -- ------------------------------------------------------------- */
 static void handler_recovery(void* parameters);
+
+static void process_cmd(ENUM_RECOV_CMD_t cmd);
+static void check_position(void);
 
 /* ============================================================= ==
    tasks functions
@@ -66,68 +70,65 @@ static void handler_recovery(void* parameters)
     while(1)
     {
         /* check for new command */
-        if(xQueueReceive(QueueHandle_recov_cmd, &cmd, (TickType_t)0))
+        if(xQueueReceive(QueueHandle_recov_cmd, &cmd, (TickType_t)0)) 
         {
-            switch(cmd)
-            {
-                case E_CMD_OPEN :
-                    /* run motors clockwise */
-                    HAL_GPIO_WritePin(DIR_M1_GPIO_Port, DIR_M1_Pin, GPIO_PIN_SET);
-                    HAL_GPIO_WritePin(DIR_M2_GPIO_Port, DIR_M2_Pin, GPIO_PIN_SET);
-
-                    /* enable the pwm */
-                    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-                    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-
-                    /* enable the motors */
-                    HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_SET);
-                    HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
-
-                    /* update system structure */
-                    recovery.status 	= E_STATUS_RUNNING;
-                    recovery.last_cmd 	= cmd;
-                    break;
-
-                case E_CMD_CLOSE :
-                    /* run motors anti-clockwise */
-                    HAL_GPIO_WritePin(DIR_M1_GPIO_Port, DIR_M1_Pin, GPIO_PIN_RESET);
-                    HAL_GPIO_WritePin(DIR_M2_GPIO_Port, DIR_M2_Pin, GPIO_PIN_RESET);
-
-                    /* enable the pwm */
-                    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-                    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-
-                    /* enable the motors */
-                    HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_SET);
-                    HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
-                    
-                    /* update system structure */
-                    recovery.status 	= E_STATUS_RUNNING;
-                    recovery.last_cmd 	= cmd;
-                    break;
-
-                case E_CMD_STOP :
-                    /* diasable the motors */
-                    HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
-                    HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_RESET);
-
-                    /* disable the pwm */
-                    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
-                    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
-
-                    /* update system structure */
-                    recovery.status 	= E_STATUS_STOP;
-                    recovery.last_cmd 	= cmd;
-
-                default :
-                    break;
-            }
+            process_cmd(cmd);
         }
 
-        /* check if the system as reach the open point */
-        if(HAL_GPIO_ReadPin(END11_GPIO_Port, END11_Pin) == GPIO_PIN_RESET
-        || HAL_GPIO_ReadPin(END12_GPIO_Port, END12_Pin) == GPIO_PIN_RESET)
-        {
+        /* check if the system has reach the end */
+        check_position();
+
+        /* wait until next task period */
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
+    }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       cmd 
+ * ************************************************************* **/
+static void process_cmd(ENUM_RECOV_CMD_t cmd)
+{
+    switch(cmd)
+    {
+        case E_CMD_OPEN :
+            /* run motors clockwise */
+            HAL_GPIO_WritePin(DIR_M1_GPIO_Port, DIR_M1_Pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(DIR_M2_GPIO_Port, DIR_M2_Pin, GPIO_PIN_SET);
+
+            /* enable the pwm */
+            HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+            HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+
+            /* enable the motors */
+            HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
+
+            /* update system structure */
+            recovery.status 	= E_STATUS_RUNNING;
+            recovery.last_cmd 	= cmd;
+            break;
+
+        case E_CMD_CLOSE :
+            /* run motors anti-clockwise */
+            HAL_GPIO_WritePin(DIR_M1_GPIO_Port, DIR_M1_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(DIR_M2_GPIO_Port, DIR_M2_Pin, GPIO_PIN_RESET);
+
+            /* enable the pwm */
+            HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+            HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+
+            /* enable the motors */
+            HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
+            
+            /* update system structure */
+            recovery.status 	= E_STATUS_RUNNING;
+            recovery.last_cmd 	= cmd;
+            break;
+
+        case E_CMD_STOP :
             /* diasable the motors */
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_RESET);
@@ -135,34 +136,63 @@ static void handler_recovery(void* parameters)
             /* disable the pwm */
             HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
             HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
-            HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
 
             /* update system structure */
-            recovery.status = E_STATUS_OPEN;
-        }
+            recovery.status 	= E_STATUS_STOP;
+            recovery.last_cmd 	= cmd;
 
-        /* check if the system as reach the open or close point */
-        if(HAL_GPIO_ReadPin(END12_GPIO_Port, END21_Pin) == GPIO_PIN_RESET
-        || HAL_GPIO_ReadPin(END12_GPIO_Port, END22_Pin) == GPIO_PIN_RESET)
-        {
-            /* diasable the motors */
-            HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_RESET);
+        default :
+            break;
+    }
 
-            /* disable the pwm*/
-            HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
-            HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
-            HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
-            
-            /* update system structure */
-             recovery.status = E_STATUS_CLOSE;
-        }
+    /* update monitoring queue */
+    xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * ************************************************************* **/
+static void check_position(void)
+{
+    /* check if the system has reach the open point */
+    if(HAL_GPIO_ReadPin(END11_GPIO_Port, END11_Pin) == GPIO_PIN_RESET
+    || HAL_GPIO_ReadPin(END12_GPIO_Port, END12_Pin) == GPIO_PIN_RESET)
+    {
+        /* diasable the motors */
+        HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_RESET);
+
+        /* disable the pwm */
+        HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+        HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
+        HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
+
+        /* update system structure */
+        recovery.status = E_STATUS_OPEN;
 
         /* update monitoring queue */
         xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
+    }
 
-        /* wait until next task period */
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
+    /* check if the system has reach the close point */
+    if(HAL_GPIO_ReadPin(END12_GPIO_Port, END21_Pin) == GPIO_PIN_RESET
+    || HAL_GPIO_ReadPin(END12_GPIO_Port, END22_Pin) == GPIO_PIN_RESET)
+    {
+        /* diasable the motors */
+        HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_RESET);
+
+        /* disable the pwm*/
+        HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+        HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
+        HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
+        
+        /* update system structure */
+        recovery.status = E_STATUS_CLOSE;
+
+        /* update monitoring queue */
+        xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
     }
 }
 
