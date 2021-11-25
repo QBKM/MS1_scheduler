@@ -75,10 +75,10 @@ static void handler_battery(void* parameters)
     xLastWakeTime = xTaskGetTickCount();
 
     /* timeout data */
-    xTimeOutType x_timeout; 
-    portTickType openTimeout;
-    vTaskSetTimeOutState(&x_timeout);
-    openTimeout = pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK);
+    xTimeOutType timeOutHandler; 
+    portTickType timeOutCounter;
+    vTaskSetTimeOutState(&timeOutHandler);
+    timeOutCounter = pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK);
 
     STRUCT_BATTERY_t DATA = {0};
 
@@ -108,10 +108,10 @@ static void handler_battery(void* parameters)
         }
 
         /* send to monitoring at periodic time */
-        if(xTaskCheckForTimeOut(&x_timeout, &openTimeout) == pdTRUE)
+        if(xTaskCheckForTimeOut(&timeOutHandler, &timeOutCounter) == pdTRUE)
         {
             xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
-            openTimeout = BATTERY_DEFAULT_TIMEOUT_TASK;
+            timeOutCounter = pdMS_TO_TICKS(BATTERY_DEFAULT_TIMEOUT_TASK + BATTERY_DEFAULT_PERIOD_TASK);
         }
 
         /* wait until next task period */
