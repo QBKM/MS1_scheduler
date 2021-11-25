@@ -18,6 +18,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
+#include "gpio.h"
 
 #include "API_application.h"
 #include "API_recovery.h"
@@ -32,10 +33,12 @@
    defines
 -- ------------------------------------------------------------- */
 /* notify flag IDs */
-#define APPLICATION_DEFAULT_AEROCONTACT_ID      0x00000001u
+#define APPLICATION_DEFAULT_AEROCONTACT_IT_ID   0x00000001u
 #define APPLICATION_DEFAULT_WINDOW_IN_IT_ID     0x00000002u
 #define APPLICATION_DEFAULT_WINDOW_OUT_IT_ID    0x00000004u
 #define APPLICATION_DEFAULT_RECOV_TIMEOUT_IT_ID 0x00000008u
+#define APPLICATION_DEFAULT_RECOV_OPEN_IT_ID    0x00000010u
+#define APPLICATION_DEFAULT_RECOV_CLOSE_IT_ID   0x00000020u
 
 #define APPLICATION_DEFAULT_PERIOD_MONITORING   100u    /* [ms] */
 #define APPLICATION_DEFAULT_PERIOD_RECOVERY     10u     /* [ms] */
@@ -51,7 +54,7 @@
 #define WINDOW_OUT_TIME             2000u   /* [ms] */
 
 /* recovery settings */
-#define RECOVERY_TIMEOUT            10000u  /* [ms] */
+#define RECOVERY_READ_DELAY         10u     /* [ms] */
 
 /* include functions */
 #define APPLICATION_INC_MNTR_RECOV      1
@@ -74,6 +77,8 @@ TaskHandle_t TaskHandle_app_aerocontact;
 TaskHandle_t TaskHandle_app_monitoring;
 TaskHandle_t TaskHandle_app_windows;
 TaskHandle_t TaskHandle_app_recovery;
+TaskHandle_t TaskHandle_app_recovery_user;
+
 TimerHandle_t TimerHandle_window_in;
 TimerHandle_t TimerHandle_window_out;
 
@@ -91,6 +96,7 @@ static void handler_app_monitoring(void* parameters);
 static void handler_app_aerocontact(void* parameters);
 static void handler_app_windows(void* parameters);
 static void handler_app_recovery(void* parameters);
+static void handler_app_recovery_user(void* parameters);
 
 /* monitoring */
 static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV);
@@ -118,7 +124,7 @@ static void handler_app_aerocontact(void* parameters)
         if(xTaskNotifyWait(0xFFFF,0, &notify_id, portMAX_DELAY) == pdTRUE) 
         {
             /* check aerocontact if the rocket has launched */
-            if(notify_id & APPLICATION_DEFAULT_AEROCONTACT_ID)
+            if(notify_id & APPLICATION_DEFAULT_AEROCONTACT_IT_ID)
             {
                 /* user indicators */
                 API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
@@ -146,6 +152,9 @@ static void handler_app_aerocontact(void* parameters)
  * ************************************************************* **/
 static void handler_app_monitoring(void* parameters)
 {
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+
     STRUCT_RECOV_MNTR_t MNTR_recov;
     STRUCT_BATTERY_MNTR_t MNTR_battery;
 
@@ -160,7 +169,7 @@ static void handler_app_monitoring(void* parameters)
         if(API_BATTERY_GET_MNTR(&MNTR_battery)) process_mntr_battery(MNTR_battery);
         #endif
 
-        vTaskDelay(pdMS_TO_TICKS(APPLICATION_DEFAULT_PERIOD_MONITORING));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(APPLICATION_DEFAULT_PERIOD_MONITORING));
     }
 }
 
@@ -222,6 +231,9 @@ static void handler_app_windows(void* parameters)
  * ************************************************************* **/
 static void handler_app_recovery(void* parameters)
 {
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+
     /* close the system */
     API_RECOVERY_SEND_CMD(E_CMD_CLOSE);
 
@@ -253,7 +265,36 @@ static void handler_app_recovery(void* parameters)
             }
         }
 
-        vTaskDelay(1);
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(APPLICATION_DEFAULT_PERIOD_RECOVERY));
+    }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       parameters 
+ * ************************************************************* **/
+static void handler_app_recovery_user(void* parameters)
+{
+    uint32_t notify_id;
+
+    while(1)
+    {
+        /* check task notify */
+        if(xTaskNotifyWait(0xFFFF, 0, &notify_id, portMAX_DELAY) == pdTRUE) 
+        {
+            /* force to open the recovery */
+            if(notify_id & APPLICATION_DEFAULT_RECOV_OPEN_IT_ID)
+            {
+                API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+            }
+
+            /* force to close the recovery */
+            if(notify_id & APPLICATION_DEFAULT_RECOV_CLOSE_IT_ID)
+            {
+                API_RECOVERY_SEND_CMD(E_CMD_CLOSE);
+            }
+        }
     }
 }
 
@@ -387,6 +428,8 @@ void API_APPLICATION_START(uint32_t priority)
     configASSERT(status == pdPASS);
     status = xTaskCreate(handler_app_recovery, "task_app_recovery", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_recovery);
     configASSERT(status == pdPASS);
+    status = xTaskCreate(handler_app_recovery_user, "task_app_recovery_user", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_recovery_user);
+    configASSERT(status == pdPASS);
 
     /* init the temporal window timers */
     TimerHandle_window_in  = xTimerCreate("timer_window_in", pdMS_TO_TICKS(WINDOW_IN_TIME), pdFALSE, (void*)0, callback_timer_window_in);
@@ -421,13 +464,26 @@ static void callback_timer_window_out(TimerHandle_t xTimer)
  * ************************************************************* **/
 void API_APPLICATION_CALLBACK_ISR(ENUM_APP_ISR_ID_t ID)
 {
-    if(ID == E_APP_ISR_AEROC)
+    switch(ID)
     {
-        if(aerocontact.flag == false)
-        {
-            /* notify the application task with aerocontact ID flag */
-            xTaskNotifyFromISR(TaskHandle_app_aerocontact, APPLICATION_DEFAULT_AEROCONTACT_ID, eSetBits, pdFALSE);
-        }
+        case E_APP_ISR_AEROC :
+            if(aerocontact.flag == false)
+            {
+                /* notify the application task with aerocontact ID flag */
+                xTaskNotifyFromISR(TaskHandle_app_aerocontact, APPLICATION_DEFAULT_AEROCONTACT_IT_ID, eSetBits, pdFALSE);
+            }
+            break;
+
+        case E_APP_ISR_RECOV_OPEN : 
+            xTaskNotifyFromISR(TaskHandle_app_recovery_user, APPLICATION_DEFAULT_RECOV_OPEN_IT_ID, eSetBits, pdFALSE);
+            break;
+
+        case E_APP_ISR_RECOV_CLOSE : 
+            xTaskNotifyFromISR(TaskHandle_app_recovery_user, APPLICATION_DEFAULT_RECOV_CLOSE_IT_ID, eSetBits, pdFALSE);
+            break;
+
+        default :  
+            break;
     }
 }
 
