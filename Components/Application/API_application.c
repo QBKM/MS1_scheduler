@@ -27,7 +27,6 @@
 #include "API_battery.h"
 
 #include "SEGGER_SYSVIEW.h"
-//#include "config.h"
 
 /* ------------------------------------------------------------- --
    defines
@@ -37,8 +36,8 @@
 #define APPLICATION_DEFAULT_WINDOW_IN_IT_ID     0x00000002u
 #define APPLICATION_DEFAULT_WINDOW_OUT_IT_ID    0x00000004u
 #define APPLICATION_DEFAULT_RECOV_TIMEOUT_IT_ID 0x00000008u
-#define APPLICATION_DEFAULT_RECOV_OPEN_IT_ID    0x00000010u
-#define APPLICATION_DEFAULT_RECOV_CLOSE_IT_ID   0x00000020u
+#define APPLICATION_DEFAULT_BTN_OPEN_IT_ID      0x00000010u
+#define APPLICATION_DEFAULT_BTN_CLOSE_IT_ID     0x00000020u
 
 #define APPLICATION_DEFAULT_PERIOD_MONITORING   100u    /* [ms] */
 #define APPLICATION_DEFAULT_PERIOD_RECOVERY     10u     /* [ms] */
@@ -60,16 +59,6 @@
 #define APPLICATION_INC_MNTR_RECOV      1
 #define APPLICATION_INC_MNTR_BATTERY    1
 
-
-/* ------------------------------------------------------------- --
-   types
--- ------------------------------------------------------------- */
-typedef struct
-{
-    volatile bool       flag;
-    volatile TickType_t triggerDate;
-}STRUCT_AEROCONTACT_t;
-
 /* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
@@ -77,7 +66,7 @@ TaskHandle_t TaskHandle_app_aerocontact;
 TaskHandle_t TaskHandle_app_monitoring;
 TaskHandle_t TaskHandle_app_windows;
 TaskHandle_t TaskHandle_app_recovery;
-TaskHandle_t TaskHandle_app_recovery_user;
+TaskHandle_t TaskHandle_app_user_buttons;
 
 TimerHandle_t TimerHandle_window_in;
 TimerHandle_t TimerHandle_window_out;
@@ -85,7 +74,6 @@ TimerHandle_t TimerHandle_window_out;
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
-static STRUCT_AEROCONTACT_t aerocontact;
 static ENUM_PHASE_t phase;
 
 /* ------------------------------------------------------------- --
@@ -96,7 +84,7 @@ static void handler_app_monitoring(void* parameters);
 static void handler_app_aerocontact(void* parameters);
 static void handler_app_windows(void* parameters);
 static void handler_app_recovery(void* parameters);
-static void handler_app_recovery_user(void* parameters);
+static void handler_app_user_buttons(void* parameters);
 
 /* monitoring */
 static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV);
@@ -133,10 +121,8 @@ static void handler_app_aerocontact(void* parameters)
                 /* start the window in counter */
                 xTimerStart(TimerHandle_window_in, 0);
 
-                /* update phase and stuct */
+                /* update phase */
                 phase = E_PHASE_ASCEND;
-                aerocontact.flag = true;
-                aerocontact.triggerDate = xTaskGetTickCount();
 
                 /* suspend itself */
                 vTaskSuspend(NULL);
@@ -234,9 +220,6 @@ static void handler_app_recovery(void* parameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
-    /* close the system */
-    API_RECOVERY_SEND_CMD(E_CMD_CLOSE);
-
     /* supend itself and wait to be called */
     vTaskSuspend(NULL);
 
@@ -274,7 +257,7 @@ static void handler_app_recovery(void* parameters)
  * 
  * @param       parameters 
  * ************************************************************* **/
-static void handler_app_recovery_user(void* parameters)
+static void handler_app_user_buttons(void* parameters)
 {
     uint32_t notify_id;
 
@@ -284,15 +267,29 @@ static void handler_app_recovery_user(void* parameters)
         if(xTaskNotifyWait(0xFFFF, 0, &notify_id, portMAX_DELAY) == pdTRUE) 
         {
             /* force to open the recovery */
-            if(notify_id & APPLICATION_DEFAULT_RECOV_OPEN_IT_ID)
+            if(notify_id & APPLICATION_DEFAULT_BTN_OPEN_IT_ID)
             {
-                API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+                if(HAL_GPIO_ReadPin(RECOVERY_OPEN_GPIO_Port, RECOVERY_OPEN_Pin) == GPIO_PIN_SET)
+                {
+                    API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+                }
+                else
+                {
+                    API_RECOVERY_SEND_CMD(E_CMD_STOP);
+                }
             }
 
             /* force to close the recovery */
-            if(notify_id & APPLICATION_DEFAULT_RECOV_CLOSE_IT_ID)
+            if(notify_id & APPLICATION_DEFAULT_BTN_CLOSE_IT_ID)
             {
-                API_RECOVERY_SEND_CMD(E_CMD_CLOSE);
+                if(HAL_GPIO_ReadPin(RECOVERY_CLOSE_GPIO_Port, RECOVERY_CLOSE_Pin) == GPIO_PIN_SET)
+                {
+                    API_RECOVERY_SEND_CMD(E_CMD_CLOSE);
+                }
+                else
+                {
+                    API_RECOVERY_SEND_CMD(E_CMD_STOP);
+                }
             }
         }
     }
@@ -415,20 +412,17 @@ void API_APPLICATION_START(uint32_t priority)
     BaseType_t status;
 
     phase = E_PHASE_WAIT;
-
-    aerocontact.flag = false;
-    aerocontact.triggerDate = 0xFFFFFFFF;
     
     /* create the tasks */
-    status = xTaskCreate(handler_app_aerocontact, "task_app_aerocontact", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_aerocontact);
+    status = xTaskCreate(handler_app_aerocontact, "task_app_aerocontact", 2*configMINIMAL_STACK_SIZE, NULL, 5, &TaskHandle_app_aerocontact);
     configASSERT(status == pdPASS);
     status = xTaskCreate(handler_app_monitoring, "task_app_monitoring", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_monitoring);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_windows, "task_app_windows", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_windows);
+    status = xTaskCreate(handler_app_windows, "task_app_windows", 2*configMINIMAL_STACK_SIZE, NULL, 5, &TaskHandle_app_windows);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_recovery, "task_app_recovery", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_recovery);
+    status = xTaskCreate(handler_app_recovery, "task_app_recovery", 2*configMINIMAL_STACK_SIZE, NULL, 5, &TaskHandle_app_recovery);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_recovery_user, "task_app_recovery_user", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_recovery_user);
+    status = xTaskCreate(handler_app_user_buttons, "task_app_user_buttons", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_user_buttons);
     configASSERT(status == pdPASS);
 
     /* init the temporal window timers */
@@ -467,19 +461,15 @@ void API_APPLICATION_CALLBACK_ISR(ENUM_APP_ISR_ID_t ID)
     switch(ID)
     {
         case E_APP_ISR_AEROC :
-            if(aerocontact.flag == false)
-            {
-                /* notify the application task with aerocontact ID flag */
-                xTaskNotifyFromISR(TaskHandle_app_aerocontact, APPLICATION_DEFAULT_AEROCONTACT_IT_ID, eSetBits, pdFALSE);
-            }
+            xTaskNotifyFromISR(TaskHandle_app_aerocontact, APPLICATION_DEFAULT_AEROCONTACT_IT_ID, eSetBits, pdFALSE);
             break;
 
         case E_APP_ISR_RECOV_OPEN : 
-            xTaskNotifyFromISR(TaskHandle_app_recovery_user, APPLICATION_DEFAULT_RECOV_OPEN_IT_ID, eSetBits, pdFALSE);
+            xTaskNotifyFromISR(TaskHandle_app_user_buttons, APPLICATION_DEFAULT_BTN_OPEN_IT_ID, eSetBits, pdFALSE);
             break;
 
         case E_APP_ISR_RECOV_CLOSE : 
-            xTaskNotifyFromISR(TaskHandle_app_recovery_user, APPLICATION_DEFAULT_RECOV_CLOSE_IT_ID, eSetBits, pdFALSE);
+            xTaskNotifyFromISR(TaskHandle_app_user_buttons, APPLICATION_DEFAULT_BTN_CLOSE_IT_ID, eSetBits, pdFALSE);
             break;
 
         default :  
