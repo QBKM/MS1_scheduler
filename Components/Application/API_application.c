@@ -20,6 +20,8 @@
 #include "timers.h"
 #include "gpio.h"
 
+#include "MS1_config.h"
+
 #include "API_application.h"
 #include "API_recovery.h"
 #include "API_buzzer.h"
@@ -407,22 +409,22 @@ static void process_mntr_battery(STRUCT_BATTERY_MNTR_t MNTR_battery)
  * @brief       
  * 
  * ************************************************************* **/
-void API_APPLICATION_START(uint32_t priority)
+void API_APPLICATION_START(void)
 {
     BaseType_t status;
 
     phase = E_PHASE_WAIT;
     
     /* create the tasks */
-    status = xTaskCreate(handler_app_aerocontact, "task_app_aerocontact", 2*configMINIMAL_STACK_SIZE, NULL, 5, &TaskHandle_app_aerocontact);
+    status = xTaskCreate(handler_app_aerocontact, "task_app_aerocontact", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_AEROCONTACT, &TaskHandle_app_aerocontact);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_monitoring, "task_app_monitoring", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_monitoring);
+    status = xTaskCreate(handler_app_monitoring, "task_app_monitoring", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_MONITORING, &TaskHandle_app_monitoring);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_windows, "task_app_windows", 2*configMINIMAL_STACK_SIZE, NULL, 5, &TaskHandle_app_windows);
+    status = xTaskCreate(handler_app_windows, "task_app_windows", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_WINDOWS, &TaskHandle_app_windows);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_recovery, "task_app_recovery", 2*configMINIMAL_STACK_SIZE, NULL, 5, &TaskHandle_app_recovery);
+    status = xTaskCreate(handler_app_recovery, "task_app_recovery", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_RECOVERY, &TaskHandle_app_recovery);
     configASSERT(status == pdPASS);
-    status = xTaskCreate(handler_app_user_buttons, "task_app_user_buttons", 2*configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_app_user_buttons);
+    status = xTaskCreate(handler_app_user_buttons, "task_app_user_buttons", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_USER_BUTTONS, &TaskHandle_app_user_buttons);
     configASSERT(status == pdPASS);
 
     /* init the temporal window timers */

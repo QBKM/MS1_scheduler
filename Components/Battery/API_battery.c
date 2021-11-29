@@ -21,6 +21,8 @@
 #include "dma.h"
 #include "stdint.h"
 
+#include "MS1_config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
@@ -214,7 +216,7 @@ static ENUM_BATTERY_STATUS_t update_status_overall(STRUCT_BATTERY_t mainStruct)
  * @brief       init and start the battery task
  * 
  * ************************************************************* **/
-void API_BATTERY_START(uint32_t priority)
+void API_BATTERY_START(void)
 {
     BaseType_t status;
 
@@ -222,7 +224,7 @@ void API_BATTERY_START(uint32_t priority)
     QueueHandle_battery_mntr = xQueueCreate(1, sizeof(STRUCT_BATTERY_t));
 
     /* create the task */
-    status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_battery);
+    status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_BATTERY, &TaskHandle_battery);
     configASSERT(status == pdPASS);
 }
 

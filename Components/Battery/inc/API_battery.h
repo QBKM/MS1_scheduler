@@ -57,7 +57,7 @@ typedef STRUCT_BATTERY_t STRUCT_BATTERY_MNTR_t;
 /* ------------------------------------------------------------- --
    function prototypes
 -- ------------------------------------------------------------- */
-void API_BATTERY_START(uint32_t priority);
+void API_BATTERY_START(void);
 bool API_BATTERY_GET_MNTR(STRUCT_BATTERY_MNTR_t* monitoring);
 
 /* ------------------------------------------------------------- --

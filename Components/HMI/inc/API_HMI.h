@@ -58,7 +58,7 @@ typedef uint8_t TYPE_HMI_ID_t;
 /* ------------------------------------------------------------- --
    function prototypes
 -- ------------------------------------------------------------- */
-void API_HMI_START(uint32_t priority);
+void API_HMI_START(void);
 void API_HMI_SEND_DATA(TYPE_HMI_ID_t dataID, const char *fmt, ...);
 
 /* ------------------------------------------------------------- --

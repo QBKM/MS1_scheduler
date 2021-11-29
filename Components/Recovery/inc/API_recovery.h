@@ -55,7 +55,7 @@ typedef STRUCT_RECOV_t STRUCT_RECOV_MNTR_t;
 /* ------------------------------------------------------------- --
    function propotypes
 -- ------------------------------------------------------------- */
-void API_RECOVERY_START(uint32_t priority);
+void API_RECOVERY_START(void);
 void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command);
 bool API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring);
 void API_RECOVERY_CALLBACK(void);

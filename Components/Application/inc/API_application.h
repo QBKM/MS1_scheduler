@@ -34,7 +34,7 @@ typedef enum
 /* ------------------------------------------------------------- --
    functions
 -- ------------------------------------------------------------- */
-void API_APPLICATION_START(uint32_t priority);
+void API_APPLICATION_START(void);
 void API_APPLICATION_CALLBACK_ISR(ENUM_APP_ISR_ID_t ID);
 
 #endif /* APPLICATION_INC_API_APPLICATION_H_ */

@@ -19,6 +19,8 @@
 #include "task.h"
 #include "gpio.h"
 
+#include "MS1_config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
@@ -87,7 +89,7 @@ static void handler_buzzer(void* parameters)
  * @brief       init and start the buzzer task
  * 
  * ************************************************************* **/
-void API_BUZZER_START(uint32_t priority)
+void API_BUZZER_START(void)
 {
     BaseType_t status;
 
@@ -99,7 +101,7 @@ void API_BUZZER_START(uint32_t priority)
     QueueHandle_buzzer = xQueueCreate (1, sizeof(STRUCT_BUZZER_t));
     
     /* create the task */
-    status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_buzzer);
+    status = xTaskCreate(handler_buzzer, "task_buzzer", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_AUDIO_BUZZER, &TaskHandle_buzzer);
     configASSERT(status == pdPASS);
 }
 

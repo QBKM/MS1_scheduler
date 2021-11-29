@@ -23,6 +23,8 @@
 #include "semphr.h"
 #include "dma.h"
 
+#include "MS1_config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
@@ -82,7 +84,7 @@ static void handler_hmi(void* parameters)
  * @brief       init and start the HMI task
  * 
  * ************************************************************* **/
-void API_HMI_START(uint32_t priority)
+void API_HMI_START(void)
 {
     BaseType_t status;
 
@@ -90,7 +92,7 @@ void API_HMI_START(uint32_t priority)
     QueueHandle_hmi = xQueueCreate(HMI_DEFAULT_QUEUE_SIZE, HMI_DEFAULT_BUFFER_SIZE);
 
     /* create the task */
-    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_hmi);
+    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_HMI, &TaskHandle_hmi);
     configASSERT(status == pdPASS);
 }
 

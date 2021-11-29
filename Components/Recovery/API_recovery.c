@@ -20,6 +20,8 @@
 #include "tim.h"
 #include "queue.h"
 
+#include "MS1_config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
@@ -203,7 +205,7 @@ static void check_position(void)
  * @brief       init and start the recovery task
  * 
  * ************************************************************* **/
-void API_RECOVERY_START(uint32_t priority)
+void API_RECOVERY_START(void)
 {
     BaseType_t status;
 
@@ -221,7 +223,7 @@ void API_RECOVERY_START(uint32_t priority)
     QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_RECOV_MNTR_t));
     
     /* create the task */
-    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_recovery);
+    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_RECOVERY, &TaskHandle_recovery);
     configASSERT(status == pdPASS);
 }
 
