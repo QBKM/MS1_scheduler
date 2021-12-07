@@ -24,6 +24,7 @@
 #define TASK_PRIORITY_APP_AEROCONTACT   (uint32_t)5     /* Application */
 #define TASK_PRIORITY_APP_WINDOWS       (uint32_t)5     /* Application */
 #define TASK_PRIORITY_SENSORS_MPU6050   (uint32_t)4     /* Sensors */
+#define TASK_PRIORITY_SENSORS_BMP280    (uint32_t)4     /* Sensors */
 #define TASK_PRIORITY_APP_USER_BUTTONS  (uint32_t)4     /* Application */
 #define TASK_PRIORITY_APP_RECOVERY      (uint32_t)3     /* Application */
 #define TASK_PRIORITY_RECOVERY          (uint32_t)3     /* Recovery */

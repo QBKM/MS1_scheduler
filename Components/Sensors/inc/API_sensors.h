@@ -17,21 +17,25 @@
 -- ------------------------------------------------------------- */
 #include "stdint.h"
 #include "stdbool.h"
+#include "mpu6050.h"
+#include "bmp280.h"
 
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
 typedef struct 
 {
-   uint8_t TODO;
-}STRUCT_SENSORS_t ;
+   bool MPU6050;
+   bool BMP280;
+}STRUCT_SENSORS_MNTR_t;
 
-typedef STRUCT_SENSORS_t STRUCT_SENSORS_MNTR_t;
 /* ------------------------------------------------------------- --
    function propotypes
 -- ------------------------------------------------------------- */
 void API_SENSORS_START(void);
 bool API_SENSORS_GET_MNTR(STRUCT_SENSORS_MNTR_t* monitoring);
+bool API_SENSORS_GET_MPU6050(MPU6050_data_t* data);
+bool API_SENSORS_GET_BMP280(BMP280_data_t* data);
 
 /* ------------------------------------------------------------- --
    end of file
