@@ -21,12 +21,17 @@
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
+typedef struct 
+{
+   uint8_t TODO;
+}STRUCT_SENSORS_t ;
 
+typedef STRUCT_SENSORS_t STRUCT_SENSORS_MNTR_t;
 /* ------------------------------------------------------------- --
    function propotypes
 -- ------------------------------------------------------------- */
 void API_SENSORS_START(void);
-bool API_SENSORS_GET_MNTR(void);
+bool API_SENSORS_GET_MNTR(STRUCT_SENSORS_MNTR_t* monitoring);
 
 /* ------------------------------------------------------------- --
    end of file

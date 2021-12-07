@@ -16,7 +16,7 @@
 /* ------------------------------------------------------------- --
    Includes
 -- ------------------------------------------------------------- */
-#include <stdint.h>
+#include "stdint.h"
 
 /* ------------------------------------------------------------- --
    types
@@ -115,7 +115,6 @@ typedef struct
     MPU6050_config_t config;
 } MPU6050_t;
 
-
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
@@ -124,6 +123,7 @@ uint8_t MPU6050_Read_Accel(void);
 uint8_t MPU6050_Read_Gyro(void);
 uint8_t MPU6050_Read_Temp(void);
 uint8_t MPU6050_Read_All(void);
+
 void MPU6050_Get_Accel(MPU6050_accel_t* accel);
 void MPU6050_Get_Gyro(MPU6050_gyro_t* gyro);
 void MPU6050_Get_Temp(MPU6050_temp_t* temp);
