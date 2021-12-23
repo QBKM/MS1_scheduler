@@ -26,13 +26,15 @@ typedef enum
 typedef enum
 {
     E_APP_ISR_NONE,
-    E_APP_ISR_AEROC
+    E_APP_ISR_AEROC,
+    E_APP_ISR_RECOV_OPEN,
+    E_APP_ISR_RECOV_CLOSE
 }ENUM_APP_ISR_ID_t;
 
 /* ------------------------------------------------------------- --
    functions
 -- ------------------------------------------------------------- */
-void API_APPLICATION_START(uint32_t priority);
+void API_APPLICATION_START(void);
 void API_APPLICATION_CALLBACK_ISR(ENUM_APP_ISR_ID_t ID);
 
 #endif /* APPLICATION_INC_API_APPLICATION_H_ */

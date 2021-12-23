@@ -20,6 +20,8 @@
 #include "tim.h"
 #include "queue.h"
 
+#include "MS1_config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
@@ -38,7 +40,7 @@ QueueHandle_t QueueHandle_recov_mntr;
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
-static STRUCT_RECOV_t recovery = {0};
+static STRUCT_RECOV_t recov_mntr = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
@@ -106,8 +108,8 @@ static void process_cmd(ENUM_RECOV_CMD_t cmd)
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
 
             /* update system structure */
-            recovery.status 	= E_STATUS_RUNNING;
-            recovery.last_cmd 	= cmd;
+            recov_mntr.status 	= E_STATUS_RUNNING;
+            recov_mntr.last_cmd = cmd;
             break;
 
         case E_CMD_CLOSE :
@@ -124,8 +126,8 @@ static void process_cmd(ENUM_RECOV_CMD_t cmd)
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
             
             /* update system structure */
-            recovery.status 	= E_STATUS_RUNNING;
-            recovery.last_cmd 	= cmd;
+            recov_mntr.status 	= E_STATUS_RUNNING;
+            recov_mntr.last_cmd = cmd;
             break;
 
         case E_CMD_STOP :
@@ -138,15 +140,15 @@ static void process_cmd(ENUM_RECOV_CMD_t cmd)
             HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
 
             /* update system structure */
-            recovery.status 	= E_STATUS_STOP;
-            recovery.last_cmd 	= cmd;
+            recov_mntr.status 	= E_STATUS_STOP;
+            recov_mntr.last_cmd = cmd;
 
         default :
             break;
     }
 
     /* update monitoring queue */
-    xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
+    xQueueSend(QueueHandle_recov_mntr, &recov_mntr, (TickType_t)0);
 }
 
 /** ************************************************************* *
@@ -169,10 +171,10 @@ static void check_position(void)
         HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
 
         /* update system structure */
-        recovery.status = E_STATUS_OPEN;
+        recov_mntr.status = E_STATUS_OPEN;
 
         /* update monitoring queue */
-        xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
+        xQueueSend(QueueHandle_recov_mntr, &recov_mntr, (TickType_t)0);
     }
 
     /* check if the system has reach the close point */
@@ -189,10 +191,10 @@ static void check_position(void)
         HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
         
         /* update system structure */
-        recovery.status = E_STATUS_CLOSE;
+        recov_mntr.status = E_STATUS_CLOSE;
 
         /* update monitoring queue */
-        xQueueSend(QueueHandle_recov_mntr, &recovery, (TickType_t)0);
+        xQueueSend(QueueHandle_recov_mntr, &recov_mntr, (TickType_t)0);
     }
 }
 
@@ -203,13 +205,13 @@ static void check_position(void)
  * @brief       init and start the recovery task
  * 
  * ************************************************************* **/
-void API_RECOVERY_START(uint32_t priority)
+void API_RECOVERY_START(void)
 {
     BaseType_t status;
 
     /* init the main structure */
-    recovery.last_cmd   = E_CMD_NONE;
-    recovery.status     = E_STATUS_NONE;
+    recov_mntr.last_cmd   = E_CMD_NONE;
+    recov_mntr.status     = E_STATUS_NONE;
 
     /* init the motors pwm dutycycle */
     TIM2->CCR2 = RECOVERY_DEFAULT_CCR2_M1;
@@ -217,11 +219,11 @@ void API_RECOVERY_START(uint32_t priority)
     TIM4->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
 
     /* create the queues */
-    QueueHandle_recov_cmd = xQueueCreate(1, sizeof(ENUM_RECOV_CMD_t));
+    QueueHandle_recov_cmd  = xQueueCreate(1, sizeof(ENUM_RECOV_CMD_t));
     QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_RECOV_MNTR_t));
     
     /* create the task */
-    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_recovery);
+    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_RECOVERY, &TaskHandle_recovery);
     configASSERT(status == pdPASS);
 }
 

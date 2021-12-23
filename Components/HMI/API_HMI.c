@@ -20,6 +20,10 @@
 #include "stdio.h"
 #include "stdarg.h"
 #include "usart.h"
+#include "semphr.h"
+#include "dma.h"
+
+#include "MS1_config.h"
 
 /* ------------------------------------------------------------- --
    defines
@@ -69,7 +73,7 @@ static void handler_hmi(void* parameters)
         HAL_UART_Transmit(&huart4, (uint8_t*)buffer, strlen(buffer), HMI_DEFAULT_UART_TIMEOUT);
 
         /* wait the next tick to send another message */
-        //vTaskDelay(1);
+        vTaskDelay(1);
     }
 }
 
@@ -80,15 +84,15 @@ static void handler_hmi(void* parameters)
  * @brief       init and start the HMI task
  * 
  * ************************************************************* **/
-void API_HMI_START(uint32_t priority)
+void API_HMI_START(void)
 {
     BaseType_t status;
 
     /* create the queue */
     QueueHandle_hmi = xQueueCreate(HMI_DEFAULT_QUEUE_SIZE, HMI_DEFAULT_BUFFER_SIZE);
-    
+
     /* create the task */
-    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_hmi);
+    status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_HMI, &TaskHandle_hmi);
     configASSERT(status == pdPASS);
 }
 
@@ -102,7 +106,7 @@ void API_HMI_START(uint32_t priority)
  * ************************************************************* **/
 void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...)
 {
-    char buffer[32];
+    char buffer[HMI_DEFAULT_BUFFER_SIZE];
     va_list args;
     va_start(args, fmt);
 

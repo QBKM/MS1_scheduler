@@ -21,10 +21,13 @@
 #include "dma.h"
 #include "stdint.h"
 
+#include "MS1_config.h"
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
 #define BATTERY_DEFAULT_PERIOD_TASK         1000u   /* [ms] */
+#define BATTERY_DEFAULT_TIMEOUT_TASK        60000u  /* [ms] */
 #define BATTERY_DEFAULT_MAX_VOLTAGE         18u     /* [volt] */
 #define BATTERY_DEFAULT_ADC_RANGE           1024u
 #define BATTERY_DEFAULT_THRESHOLD_VOLTAGE   7.5f    /* [volt] */
@@ -54,6 +57,7 @@ QueueHandle_t QueueHandle_battery_mntr;
    prototypes
 -- ------------------------------------------------------------- */
 static void handler_battery(void* parameters);
+static bool status_toggle(ENUM_BATTERY_STATUS_t status);
 static float convert_adc_volt(uint32_t raw_adc);
 static float convert_adc_current(uint32_t raw_adc);
 static ENUM_BATTERY_STATUS_t update_status(TYPE_BATTERY_VOLTAGE_t volt);
@@ -71,6 +75,12 @@ static void handler_battery(void* parameters)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
+
+    /* timeout data */
+    xTimeOutType timeOutHandler; 
+    portTickType timeOutCounter;
+    vTaskSetTimeOutState(&timeOutHandler);
+    timeOutCounter = pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK);
 
     STRUCT_BATTERY_t DATA = {0};
 
@@ -93,12 +103,41 @@ static void handler_battery(void* parameters)
         DATA.BAT_MOTOR2.status = update_status(DATA.BAT_MOTOR2.volt);
         DATA.STATUS            = update_status_overall(DATA);
 
-        /* send the data to the queue */
-        xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
+        /* send to monitoring if the battery status toggle */
+        if(status_toggle(DATA.STATUS) == true)
+        {
+            xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
+        }
+
+        /* send to monitoring at periodic time */
+        if(xTaskCheckForTimeOut(&timeOutHandler, &timeOutCounter) == pdTRUE)
+        {
+            xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
+            timeOutCounter = pdMS_TO_TICKS(BATTERY_DEFAULT_TIMEOUT_TASK + BATTERY_DEFAULT_PERIOD_TASK);
+        }
 
         /* wait until next task period */
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK));
     }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       status 
+ * @return      true 
+ * @return      false 
+ * ************************************************************* **/
+static bool status_toggle(ENUM_BATTERY_STATUS_t status)
+{
+    static ENUM_BATTERY_STATUS_t last = E_BATTERY_NONE;
+    bool res;
+
+    /* if the value isn't the same than previous return true */
+    res = (last != status) ? true : false;
+    last = status;
+
+    return res;
 }
 
 /** ************************************************************* *
@@ -177,7 +216,7 @@ static ENUM_BATTERY_STATUS_t update_status_overall(STRUCT_BATTERY_t mainStruct)
  * @brief       init and start the battery task
  * 
  * ************************************************************* **/
-void API_BATTERY_START(uint32_t priority)
+void API_BATTERY_START(void)
 {
     BaseType_t status;
 
@@ -185,7 +224,7 @@ void API_BATTERY_START(uint32_t priority)
     QueueHandle_battery_mntr = xQueueCreate(1, sizeof(STRUCT_BATTERY_t));
 
     /* create the task */
-    status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, priority, &TaskHandle_battery);
+    status = xTaskCreate(handler_battery, "task_battery", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_BATTERY, &TaskHandle_battery);
     configASSERT(status == pdPASS);
 }
 

@@ -1,29 +1,35 @@
 /** ************************************************************* *
- * @file        API_buzzer.h
+ * @file        API_sensors.h
  * @brief       
  * 
- * @date        2021-08-16
+ * @date        2021-11-29
  * @author      Quentin Bakrim (quentin.bakrim@hotmail.fr)
  * 
  * Mines Space
  * 
  * ************************************************************* **/
 
-#ifndef AUDIO_BUZZER_INC_API_BUZZER_H_
-#define AUDIO_BUZZER_INC_API_BUZZER_H_
+#ifndef RECOVERY_INC_API_SENSORS_H_
+#define RECOVERY_INC_API_SENSORS_H_
 
 /* ------------------------------------------------------------- --
    includes
 -- ------------------------------------------------------------- */
 #include "stdint.h"
+#include "stdbool.h"
 
 /* ------------------------------------------------------------- --
-   function prototypes
+   types
 -- ------------------------------------------------------------- */
-void API_BUZZER_START(void);
-void API_BUZZER_SEND_PARAMETER(uint16_t period, float dutycycle);
+
+/* ------------------------------------------------------------- --
+   function propotypes
+-- ------------------------------------------------------------- */
+void API_SENSORS_START(void);
+bool API_SENSORS_GET_MNTR(void);
 
 /* ------------------------------------------------------------- --
    end of file
 -- ------------------------------------------------------------- */
-#endif /* AUDIO_BUZZER_INC_API_BUZZER_H_ */
+
+#endif /* RECOVERY_INC_API_SENSORS_H_ */
