@@ -94,40 +94,47 @@ typedef int16_t MPU6050_temp_t;
 /* raw data structure */
 typedef struct
 {
-    MPU6050_raw_accel_t accel;
-    MPU6050_raw_gyro_t gyro;
-    MPU6050_raw_temp_t temp;
+    MPU6050_raw_accel_t A;
+    MPU6050_raw_gyro_t G;
+    MPU6050_raw_temp_t Temp;
 }MPU6050_raw_data_t;
 
 /* raw data structure */
 typedef struct
 {
-    MPU6050_accel_t accel;
-    MPU6050_gyro_t gyro;
-    MPU6050_temp_t temp;
+    MPU6050_accel_t A;
+    MPU6050_gyro_t G;
+    MPU6050_temp_t Temp;
 }MPU6050_data_t;
+
+typedef struct 
+{
+    float KalmanAngleX;
+    float KalmanAngleY;
+}MPU6050_kalman_data_t;
 
 /* MPU6050 handle structure */
 typedef struct 
 {
     MPU6050_data_t data;
     MPU6050_raw_data_t raw;
+    MPU6050_kalman_data_t kalman;
     MPU6050_config_t config;
-} MPU6050_t;
+}MPU6050_t;
+
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
 uint8_t MPU6050_Init(void);
+
 uint8_t MPU6050_Read_Accel(void);
 uint8_t MPU6050_Read_Gyro(void);
 uint8_t MPU6050_Read_Temp(void);
 uint8_t MPU6050_Read_All(void);
+uint8_t MPU6050_Read_All_Kalman(float dt);
 
-void MPU6050_Get_Accel(MPU6050_accel_t* accel);
-void MPU6050_Get_Gyro(MPU6050_gyro_t* gyro);
-void MPU6050_Get_Temp(MPU6050_temp_t* temp);
-void MPU6050_Get_All(MPU6050_data_t* data);
+void MPU6050_Get_Struct(MPU6050_t* data);
 
 #endif /* __MPU6050_H__ */
 /* ------------------------------------------------------------- --

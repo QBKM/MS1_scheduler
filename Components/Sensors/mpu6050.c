@@ -35,10 +35,25 @@
 #define MPU6050_GYRO_XOUT_H_REG 	0x43
 
 #ifndef MPU6050_ADDR
-#define MPU6050_ADDR 				(0x69 << 1) 	/* ( << 1 because of the R/W bit */
+#define MPU6050_ADDR 				(0x68 << 1) 	/* ( << 1 because of the R/W bit */
 #endif
 
 #define I2C_HANDLER                 hi2c2
+
+#define RAD_TO_DEG 					57.295779513082320876798154814105f
+
+/* ------------------------------------------------------------- --
+   types
+-- ------------------------------------------------------------- */
+typedef struct 
+{
+    float Q_angle;
+    float Q_bias;
+    float R_measure;
+    float angle;
+    float bias;
+    float P[2][2];
+} Kalman_t;
 
 /* ------------------------------------------------------------- --
    variables
@@ -46,6 +61,20 @@
 
 /* MPU6050 struct */
 static MPU6050_t MPU6050 = {0};
+
+static Kalman_t KalmanX = 
+{
+    .Q_angle   = 0.001f,
+    .Q_bias    = 0.003f,
+    .R_measure = 0.03f
+};
+/* initialiaze the Y axis Kalman */
+static Kalman_t KalmanY = 
+{
+    .Q_angle   = 0.001f,
+    .Q_bias    = 0.003f,
+    .R_measure = 0.03f,
+};
 
 /* accel correctors */
 const float Accel_X_Y_Z_corrector = 2048.0; 
@@ -63,6 +92,11 @@ const float Gyro_X_Y_Z_corrector = 16.4;
     FS_SEL = 2000->  16.4
 */
 
+
+/* ------------------------------------------------------------- --
+   prototypes
+-- ------------------------------------------------------------- */
+static float Get_Kalman_Angle(Kalman_t *Kalman, float newAngle, float newRate, float dt);
 
 /* ============================================================= ==
    public functions
@@ -122,14 +156,14 @@ uint8_t MPU6050_Read_Accel(void)
     /* Read 6 BYTES of data starting from ACCEL_XOUT_H register */
     if(HAL_I2C_Mem_Read(&I2C_HANDLER, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H_REG, 1, data, sizeof(data), TIMEOUT_I2C)) return HAL_ERROR;
 
-    MPU6050.raw.accel.X = (int16_t) (data[0] << 8 | data[1]);
-    MPU6050.raw.accel.Y = (int16_t) (data[2] << 8 | data[3]);
-    MPU6050.raw.accel.Z = (int16_t) (data[4] << 8 | data[5]);
+    MPU6050.raw.A.X = (int16_t) (data[0] << 8 | data[1]);
+    MPU6050.raw.A.Y = (int16_t) (data[2] << 8 | data[3]);
+    MPU6050.raw.A.Z = (int16_t) (data[4] << 8 | data[5]);
 
     /* convert the RAW values into acceleration in 'g' */
-    MPU6050.data.accel.X = MPU6050.raw.accel.X / Accel_X_Y_Z_corrector;
-    MPU6050.data.accel.Y = MPU6050.raw.accel.Y / Accel_X_Y_Z_corrector;
-    MPU6050.data.accel.Z = MPU6050.raw.accel.Z / Accel_X_Y_Z_corrector;
+    MPU6050.data.A.X = MPU6050.raw.A.X / Accel_X_Y_Z_corrector;
+    MPU6050.data.A.Y = MPU6050.raw.A.Y / Accel_X_Y_Z_corrector;
+    MPU6050.data.A.Z = MPU6050.raw.A.Z / Accel_X_Y_Z_corrector;
 
     return HAL_OK;
 }
@@ -146,14 +180,14 @@ uint8_t MPU6050_Read_Gyro(void)
     // Read 6 BYTES of data starting from GYRO_XOUT_H register
     if(HAL_I2C_Mem_Read(&I2C_HANDLER, MPU6050_ADDR, MPU6050_GYRO_XOUT_H_REG, 1, data, sizeof(data), TIMEOUT_I2C)) return HAL_ERROR;
 
-    MPU6050.raw.gyro.X = (int16_t) (data[0] << 8 | data[1]);
-    MPU6050.raw.gyro.Y = (int16_t) (data[2] << 8 | data[3]);
-    MPU6050.raw.gyro.Z = (int16_t) (data[4] << 8 | data[5]);
+    MPU6050.raw.G.X = (int16_t) (data[0] << 8 | data[1]);
+    MPU6050.raw.G.Y = (int16_t) (data[2] << 8 | data[3]);
+    MPU6050.raw.G.Z = (int16_t) (data[4] << 8 | data[5]);
 
     /* convert the RAW values into dps (deg/s) */
-    MPU6050.data.gyro.X = MPU6050.raw.gyro.X  / Gyro_X_Y_Z_corrector;
-    MPU6050.data.gyro.Y = MPU6050.raw.gyro.Y  / Gyro_X_Y_Z_corrector;
-    MPU6050.data.gyro.Z = MPU6050.raw.gyro.Z  / Gyro_X_Y_Z_corrector;
+    MPU6050.data.G.X = MPU6050.raw.G.X  / Gyro_X_Y_Z_corrector;
+    MPU6050.data.G.Y = MPU6050.raw.G.Y  / Gyro_X_Y_Z_corrector;
+    MPU6050.data.G.Z = MPU6050.raw.G.Z  / Gyro_X_Y_Z_corrector;
 
     return HAL_OK;
 }
@@ -170,8 +204,8 @@ uint8_t MPU6050_Read_Temp(void)
     // Read 2 BYTES of data starting from TEMP_OUT_H_REG register
     if(HAL_I2C_Mem_Read(&I2C_HANDLER, MPU6050_ADDR, MPU6050_TEMP_OUT_H_REG, 1, data, sizeof(data), TIMEOUT_I2C)) return HAL_ERROR;
 
-    MPU6050.raw.temp  = (int16_t) (data[0] << 8 | data[1]);
-    MPU6050.data.temp = (float) ((int16_t) MPU6050.raw.temp / (float) 340.0 + (float) 36.53);
+    MPU6050.raw.Temp  = (int16_t) (data[0] << 8 | data[1]);
+    MPU6050.data.Temp = (float) ((int16_t) MPU6050.raw.Temp / (float) 340.0 + (float) 36.53);
 
     return HAL_OK;
 }
@@ -189,30 +223,73 @@ uint8_t MPU6050_Read_All(void)
     if(HAL_I2C_Mem_Read(&I2C_HANDLER, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H_REG, 1, data, sizeof(data), TIMEOUT_I2C)) return HAL_ERROR;
 
     /*< get accel >*/
-    MPU6050.raw.accel.X = (int16_t) (data[0] << 8 | data[1]);
-    MPU6050.raw.accel.Y = (int16_t) (data[2] << 8 | data[3]);
-    MPU6050.raw.accel.Z = (int16_t) (data[4] << 8 | data[5]);
+    MPU6050.raw.A.X = (int16_t) (data[0] << 8 | data[1]);
+    MPU6050.raw.A.Y = (int16_t) (data[2] << 8 | data[3]);
+    MPU6050.raw.A.Z = (int16_t) (data[4] << 8 | data[5]);
 
     /*< get temperature >*/
-    MPU6050.raw.temp = (int16_t) (data[6] << 8 | data[7]);
+    MPU6050.raw.Temp = (int16_t) (data[6] << 8 | data[7]);
 
     /*< get gyro >*/
-    MPU6050.raw.gyro.X = (int16_t) (data[8]  << 8 | data[9]);
-    MPU6050.raw.gyro.Y = (int16_t) (data[10] << 8 | data[11]);
-    MPU6050.raw.gyro.Z = (int16_t) (data[12] << 8 | data[13]);
+    MPU6050.raw.G.X = (int16_t) (data[8]  << 8 | data[9]);
+    MPU6050.raw.G.Y = (int16_t) (data[10] << 8 | data[11]);
+    MPU6050.raw.G.Z = (int16_t) (data[12] << 8 | data[13]);
 
     /*< get corrected accel >*/
-    MPU6050.data.accel.X = MPU6050.raw.accel.X / Accel_X_Y_Z_corrector;
-    MPU6050.data.accel.Y = MPU6050.raw.accel.Y / Accel_X_Y_Z_corrector;
-    MPU6050.data.accel.Z = MPU6050.raw.accel.Z / Accel_X_Y_Z_corrector;
+    MPU6050.data.A.X = MPU6050.raw.A.X / Accel_X_Y_Z_corrector;
+    MPU6050.data.A.Y = MPU6050.raw.A.Y / Accel_X_Y_Z_corrector;
+    MPU6050.data.A.Z = MPU6050.raw.A.Z / Accel_X_Y_Z_corrector;
 
     /*< get corrected temperature >*/
-    MPU6050.data.temp = (float) (MPU6050.raw.temp / (float) 340.0 + (float) 36.53);
+    MPU6050.data.Temp = (float) (MPU6050.raw.Temp / (float) 340.0 + (float) 36.53);
 
     /*< get corrected gyro >*/
-    MPU6050.data.gyro.X = MPU6050.raw.gyro.X / Gyro_X_Y_Z_corrector;
-    MPU6050.data.gyro.Y = MPU6050.raw.gyro.Y / Gyro_X_Y_Z_corrector;
-    MPU6050.data.gyro.Z = MPU6050.raw.gyro.Z / Gyro_X_Y_Z_corrector;
+    MPU6050.data.G.X = MPU6050.raw.G.X / Gyro_X_Y_Z_corrector;
+    MPU6050.data.G.Y = MPU6050.raw.G.Y / Gyro_X_Y_Z_corrector;
+    MPU6050.data.G.Z = MPU6050.raw.G.Z / Gyro_X_Y_Z_corrector;
+
+    return HAL_OK;
+}
+
+/** ************************************************************* *
+ * @brief       read all and apply the kalman filter to the result
+ * 
+ * @return      uint8_t 
+ * ************************************************************* **/
+uint8_t MPU6050_Read_All_Kalman(float dt)
+{
+    if(MPU6050_Read_All()) return HAL_ERROR;
+
+    float roll;
+    float roll_sqrt;
+    float pitch;
+
+    roll_sqrt = sqrt(MPU6050.raw.A.X * MPU6050.raw.A.X + MPU6050.raw.A.Z * MPU6050.raw.A.Z);
+
+    if (roll_sqrt != 0.0) 
+    {
+        roll = (float)atan(MPU6050.raw.A.Y / roll_sqrt) * RAD_TO_DEG;
+    } 
+	else 
+	{
+        roll = 0.0;
+    }
+
+
+    pitch = (float)atan2(-MPU6050.raw.A.X, MPU6050.raw.A.Z) * RAD_TO_DEG;
+    if((pitch < -90 && MPU6050.kalman.KalmanAngleY >  90)
+	|| (pitch >  90 && MPU6050.kalman.KalmanAngleY < -90))
+	{
+        KalmanY.angle = pitch;
+        MPU6050.kalman.KalmanAngleY = pitch;
+    } 
+	else 
+	{
+        MPU6050.kalman.KalmanAngleY = Get_Kalman_Angle(&KalmanY, pitch, MPU6050.data.G.Y, dt);
+    }
+
+    if (fabs(MPU6050.kalman.KalmanAngleY) > 90) MPU6050.data.G.X = -MPU6050.data.G.X;
+    MPU6050.kalman.KalmanAngleX = Get_Kalman_Angle(&KalmanX, roll, MPU6050.data.G.Y, dt);
 
     return HAL_OK;
 }
@@ -220,34 +297,40 @@ uint8_t MPU6050_Read_All(void)
 /** ************************************************************* *
  * @brief       
  * 
- * @param       accel 
- * @return      uint8_t 
+ * @param       Kalman 
+ * @param       newAngle 
+ * @param       newRate 
+ * @param       dt 
+ * @return      float 
  * ************************************************************* **/
-void MPU6050_Get_Accel(MPU6050_accel_t* accel)
+static float Get_Kalman_Angle(Kalman_t *Kalman, float newAngle, float newRate, float dt)
 {
-    *accel = MPU6050.data.accel;
-}
+    float rate = newRate - Kalman->bias;
+    Kalman->angle += dt * rate;
 
-/** ************************************************************* *
- * @brief       
- * 
- * @param       gyro 
- * @return      uint8_t 
- * ************************************************************* **/
-void MPU6050_Get_Gyro(MPU6050_gyro_t* gyro)
-{
-    *gyro = MPU6050.data.gyro;
-}
+    Kalman->P[0][0] += dt * (dt * Kalman->P[1][1] - Kalman->P[0][1] - Kalman->P[1][0] + Kalman->Q_angle);
+    Kalman->P[0][1] -= dt * Kalman->P[1][1];
+    Kalman->P[1][0] -= dt * Kalman->P[1][1];
+    Kalman->P[1][1] += Kalman->Q_bias * dt;
 
-/** ************************************************************* *
- * @brief       
- * 
- * @param       temp 
- * @return      uint8_t 
- * ************************************************************* **/
-void MPU6050_Get_Temp(MPU6050_temp_t* temp)
-{
-    *temp = MPU6050.data.temp;
+    float S = Kalman->P[0][0] + Kalman->R_measure;
+    float K[2];
+    K[0] = Kalman->P[0][0] / S;
+    K[1] = Kalman->P[1][0] / S;
+
+    float y = newAngle - Kalman->angle;
+    Kalman->angle += K[0] * y;
+    Kalman->bias += K[1] * y;
+
+    float P00_temp = Kalman->P[0][0];
+    float P01_temp = Kalman->P[0][1];
+
+    Kalman->P[0][0] -= K[0] * P00_temp;
+    Kalman->P[0][1] -= K[0] * P01_temp;
+    Kalman->P[1][0] -= K[1] * P00_temp;
+    Kalman->P[1][1] -= K[1] * P01_temp;
+
+    return Kalman->angle;
 }
 
 /** ************************************************************* *
@@ -256,9 +339,9 @@ void MPU6050_Get_Temp(MPU6050_temp_t* temp)
  * @param       data 
  * @return      uint8_t 
  * ************************************************************* **/
-void MPU6050_Get_All(MPU6050_data_t* data)
+void MPU6050_Get_Struct(MPU6050_t* data)
 {
-    *data = MPU6050.data;
+    *data = MPU6050;
 }
 
 

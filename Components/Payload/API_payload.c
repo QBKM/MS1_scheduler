@@ -1,8 +1,8 @@
 /** ************************************************************* *
- * @file        API_recovery.c
+ * @file        API_payload.c
  * @brief       
  * 
- * @date        2021-10-11
+ * @date        2021-12-08
  * @author      Quentin Bakrim (quentin.bakrim@hotmail.fr)
  * 
  * Mines Space
@@ -13,7 +13,7 @@
 /* ------------------------------------------------------------- --
    include
 -- ------------------------------------------------------------- */
-#include "API_recovery.h"
+#include "API_payload.h"
 #include "freeRtos.h"
 #include "task.h"
 #include "gpio.h"
@@ -25,35 +25,36 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define RECOVERY_PERIOD_TASK    100u    /* [ms] */
-#define RECOVERY_CCR2_M1        3840u   /* 80% PWM (ARR = 4800) */
-#define RECOVERY_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
+#define PAYLOAD_DEFAULT_PERIOD_TASK    100u     /* [ms] */
+#define PAYLOAD_DEFAULT_CCR2_M1        3840u   /* 80% PWM (ARR = 4800) */
+#define PAYLOAD_DEFAULT_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
+
 
 /* ------------------------------------------------------------- --
    handles
 -- ------------------------------------------------------------- */
-TaskHandle_t TaskHandle_recovery;
-QueueHandle_t QueueHandle_recov_cmd;
-QueueHandle_t QueueHandle_recov_mntr;
+TaskHandle_t TaskHandle_payload;
+QueueHandle_t QueueHandle_payload_cmd;
+QueueHandle_t QueueHandle_payload_mntr;
 
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
-static STRUCT_RECOV_t recov_mntr = {0};
+static STRUCT_PAYLOAD_t payload_mntr = {0};
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
-static void handler_recovery(void* parameters);
+static void handler_payload(void* parameters);
 
-static void process_cmd(ENUM_RECOV_CMD_t cmd);
+static void process_cmd(ENUM_PAYLOAD_CMD_t cmd);
 static void check_position(void);
 
 /* ============================================================= ==
    tasks functions
 == ============================================================= */
 /** ************************************************************* *
- * @brief       This task manage the recovery system with the 
+ * @brief       This task manage the payload system with the 
  *              opening or closing features. The task need to 
  *              receive command from queue to operate.
  *              Please check at the ENUM_CMD_ID_t enum to send
@@ -61,17 +62,17 @@ static void check_position(void);
  * 
  * @param       parameters 
  * ************************************************************* **/
-static void handler_recovery(void* parameters)
+static void handler_payload(void* parameters)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
-    ENUM_RECOV_CMD_t cmd = E_CMD_RECOV_NONE;
+    ENUM_PAYLOAD_CMD_t cmd = E_CMD_PL_NONE;
 
     while(1)
     {
         /* check for new command */
-        if(xQueueReceive(QueueHandle_recov_cmd, &cmd, (TickType_t)0)) 
+        if(xQueueReceive(QueueHandle_payload_cmd, &cmd, (TickType_t)0)) 
         {
             process_cmd(cmd);
         }
@@ -80,7 +81,7 @@ static void handler_recovery(void* parameters)
         check_position();
 
         /* wait until next task period */
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(PAYLOAD_DEFAULT_PERIOD_TASK));
     }
 }
 
@@ -89,11 +90,11 @@ static void handler_recovery(void* parameters)
  * 
  * @param       cmd 
  * ************************************************************* **/
-static void process_cmd(ENUM_RECOV_CMD_t cmd)
+static void process_cmd(ENUM_PAYLOAD_CMD_t cmd)
 {
     switch(cmd)
     {
-        case E_CMD_RECOV_OPEN :
+        case E_CMD_PL_OPEN :
             /* run motors clockwise */
             HAL_GPIO_WritePin(DIR_M1_GPIO_Port, DIR_M1_Pin, GPIO_PIN_SET);
             HAL_GPIO_WritePin(DIR_M2_GPIO_Port, DIR_M2_Pin, GPIO_PIN_SET);
@@ -107,11 +108,11 @@ static void process_cmd(ENUM_RECOV_CMD_t cmd)
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
 
             /* update system structure */
-            recov_mntr.status 	= E_STATUS_RECOV_RUNNING;
-            recov_mntr.last_cmd = cmd;
+            payload_mntr.status 	= E_STATUS_PL_RUNNING;
+            payload_mntr.last_cmd = cmd;
             break;
 
-        case E_CMD_RECOV_CLOSE :
+        case E_CMD_PL_CLOSE :
             /* run motors anti-clockwise */
             HAL_GPIO_WritePin(DIR_M1_GPIO_Port, DIR_M1_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(DIR_M2_GPIO_Port, DIR_M2_Pin, GPIO_PIN_RESET);
@@ -125,11 +126,11 @@ static void process_cmd(ENUM_RECOV_CMD_t cmd)
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_SET);
             
             /* update system structure */
-            recov_mntr.status 	= E_STATUS_RECOV_RUNNING;
-            recov_mntr.last_cmd = cmd;
+            payload_mntr.status   = E_STATUS_PL_RUNNING;
+            payload_mntr.last_cmd = cmd;
             break;
 
-        case E_CMD_RECOV_STOP :
+        case E_CMD_PL_STOP :
             /* diasable the motors */
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M1_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(EN_M1_GPIO_Port, EN_M2_Pin, GPIO_PIN_RESET);
@@ -139,15 +140,15 @@ static void process_cmd(ENUM_RECOV_CMD_t cmd)
             HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
 
             /* update system structure */
-            recov_mntr.status 	= E_STATUS_RECOV_STOP;
-            recov_mntr.last_cmd = cmd;
+            payload_mntr.status   = E_STATUS_PL_STOP;
+            payload_mntr.last_cmd = cmd;
 
         default :
             break;
     }
 
     /* update monitoring queue */
-    xQueueSend(QueueHandle_recov_mntr, &recov_mntr, (TickType_t)0);
+    xQueueSend(QueueHandle_payload_mntr, &payload_mntr, (TickType_t)0);
 }
 
 /** ************************************************************* *
@@ -169,10 +170,10 @@ static void check_position(void)
         HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
 
         /* update system structure */
-        recov_mntr.status = E_STATUS_RECOV_OPEN;
+        payload_mntr.status = E_STATUS_PL_OPEN;
 
         /* update monitoring queue */
-        xQueueSend(QueueHandle_recov_mntr, &recov_mntr, (TickType_t)0);
+        xQueueSend(QueueHandle_payload_mntr, &payload_mntr, (TickType_t)0);
     }
 
     /* check if the system has reach the close point */
@@ -186,13 +187,12 @@ static void check_position(void)
         /* disable the pwm*/
         HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
         HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
-
         
         /* update system structure */
-        recov_mntr.status = E_STATUS_RECOV_CLOSE;
+        payload_mntr.status = E_STATUS_PL_CLOSE;
 
         /* update monitoring queue */
-        xQueueSend(QueueHandle_recov_mntr, &recov_mntr, (TickType_t)0);
+        xQueueSend(QueueHandle_payload_mntr, &payload_mntr, (TickType_t)0);
     }
 }
 
@@ -200,51 +200,50 @@ static void check_position(void)
    public functions
 == ============================================================= */
 /** ************************************************************* *
- * @brief       init and start the recovery task
+ * @brief       init and start the payload task
  * 
  * ************************************************************* **/
-void API_RECOVERY_START(void)
+void API_PAYLOAD_START(void)
 {
     BaseType_t status;
 
     /* init the main structure */
-    recov_mntr.last_cmd   = E_CMD_RECOV_NONE;
-    recov_mntr.status     = E_STATUS_RECOV_NONE;
+    payload_mntr.last_cmd   = E_CMD_PL_NONE;
+    payload_mntr.status     = E_STATUS_PL_NONE;
 
     /* init the motors pwm dutycycle */
-    TIM2->CCR2 = RECOVERY_DEFAULT_CCR2_M1;
-    TIM3->CCR3 = RECOVERY_DEFAULT_CCR2_M2;
-    TIM4->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
+    TIM2->CCR2 = PAYLOAD_DEFAULT_CCR2_M1;
+    TIM3->CCR3 = PAYLOAD_DEFAULT_CCR2_M2;
 
     /* create the queues */
-    QueueHandle_recov_cmd  = xQueueCreate(1, sizeof(ENUM_RECOV_CMD_t));
-    QueueHandle_recov_mntr = xQueueCreate(1, sizeof(STRUCT_RECOV_MNTR_t));
+    QueueHandle_payload_cmd  = xQueueCreate(1, sizeof(ENUM_PAYLOAD_CMD_t));
+    QueueHandle_payload_mntr = xQueueCreate(1, sizeof(STRUCT_PAYLOAD_MNTR_t));
     
     /* create the task */
-    status = xTaskCreate(handler_recovery, "task_recovery", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_RECOVERY, &TaskHandle_recovery);
+    status = xTaskCreate(handler_payload, "task_payload", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_PAYLOAD, &TaskHandle_payload);
     configASSERT(status == pdPASS);
 }
 
 /** ************************************************************* *
- * @brief       send a command to the recovery task
+ * @brief       send a command to the payload task
  * 
  * @param       cmd 
  * ************************************************************* **/
-void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command)
+void API_PAYLOAD_SEND_CMD(ENUM_PAYLOAD_CMD_t command)
 {
-    xQueueSend(QueueHandle_recov_cmd, &command, (TickType_t)0);
+    xQueueSend(QueueHandle_payload_cmd, &command, (TickType_t)0);
 }
 
 /** ************************************************************* *
- * @brief       get the recovery status
+ * @brief       get the payload status
  * 
  * @param       monitoring 
  * @return      true    new status received
  * @return      false   nothing received
  * ************************************************************* **/
-bool API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring)
+bool API_PAYLOAD_GET_MNTR(STRUCT_PAYLOAD_MNTR_t* monitoring)
 {
-    return (xQueueReceive(QueueHandle_recov_mntr, monitoring, (TickType_t)0)) ? true : false;
+    return (xQueueReceive(QueueHandle_payload_mntr, monitoring, (TickType_t)0)) ? true : false;
 }
 
 /* ------------------------------------------------------------- --
