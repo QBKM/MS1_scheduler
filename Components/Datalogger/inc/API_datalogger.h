@@ -1,44 +1,38 @@
 /** ************************************************************* *
- * @file        API_sensors.h
+ * @file        API_recovery.h
  * @brief       
  * 
- * @date        2021-11-29
+ * @date        2021-10-11
  * @author      Quentin Bakrim (quentin.bakrim@hotmail.fr)
  * 
  * Mines Space
  * 
  * ************************************************************* **/
 
-#ifndef RECOVERY_INC_API_SENSORS_H_
-#define RECOVERY_INC_API_SENSORS_H_
+#ifndef RECOVERY_INC_API_RECOVERY_H_
+#define RECOVERY_INC_API_RECOVERY_H_
 
 /* ------------------------------------------------------------- --
    includes
 -- ------------------------------------------------------------- */
 #include "stdint.h"
 #include "stdbool.h"
-#include "mpu6050.h"
-#include "bmp280.h"
 
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
-typedef struct 
-{
-   bool MPU6050;
-   bool BMP280;
-}STRUCT_SENSORS_MNTR_t;
+/* id */
 
 /* ------------------------------------------------------------- --
    function propotypes
 -- ------------------------------------------------------------- */
-void API_SENSORS_START(void);
-bool API_SENSORS_GET_MNTR(STRUCT_SENSORS_MNTR_t* monitoring);
-bool API_SENSORS_GET_MPU6050(MPU6050_data_t* data);
-bool API_SENSORS_GET_BMP280(BMP280_data_t* data);
+void API_DATALOGGER_START(void);
+void API_DATALOGGER_SEND_CMD(ENUM_RECOV_CMD_t command);
+bool API_DATALOGGER_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring);
+
 
 /* ------------------------------------------------------------- --
    end of file
 -- ------------------------------------------------------------- */
 
-#endif /* RECOVERY_INC_API_SENSORS_H_ */
+#endif /* RECOVERY_INC_API_RECOVERY_H_ */

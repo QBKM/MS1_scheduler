@@ -24,6 +24,7 @@
 
 #include "API_application.h"
 #include "API_recovery.h"
+#include "API_payload.h"
 #include "API_buzzer.h"
 #include "API_HMI.h"
 #include "API_battery.h"
@@ -59,6 +60,7 @@
 
 /* include functions */
 #define APPLICATION_INC_MNTR_RECOV      1
+#define APPLICATION_INC_MNTR_PAYLOAD    1
 #define APPLICATION_INC_MNTR_BATTERY    1
 
 /* ------------------------------------------------------------- --
@@ -68,6 +70,7 @@ TaskHandle_t TaskHandle_app_aerocontact;
 TaskHandle_t TaskHandle_app_monitoring;
 TaskHandle_t TaskHandle_app_windows;
 TaskHandle_t TaskHandle_app_recovery;
+TaskHandle_t TaskHandle_app_payload;
 TaskHandle_t TaskHandle_app_user_buttons;
 
 TimerHandle_t TimerHandle_window_in;
@@ -86,10 +89,12 @@ static void handler_app_monitoring(void* parameters);
 static void handler_app_aerocontact(void* parameters);
 static void handler_app_windows(void* parameters);
 static void handler_app_recovery(void* parameters);
+static void handler_app_payload(void* parameters);
 static void handler_app_user_buttons(void* parameters);
 
 /* monitoring */
 static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV);
+static void process_mntr_payload(STRUCT_PAYLOAD_MNTR_t MNTR_PAYLOAD);
 static void process_mntr_battery(STRUCT_BATTERY_MNTR_t MNTR_battery);
 
 /* callbacks */
@@ -119,6 +124,7 @@ static void handler_app_aerocontact(void* parameters)
                 /* user indicators */
                 API_BUZZER_SEND_PARAMETER(BUZZER_ASCEND_PERIOD, BUZZER_ASCEND_DUTYCYCLE);
                 API_HMI_SEND_DATA(HMI_ID_APP_PHASE, "a");
+                API_HMI_SEND_DATA(HMI_ID_APP_AEROC, "r");
 
                 /* start the window in counter */
                 xTimerStart(TimerHandle_window_in, 0);
@@ -144,6 +150,7 @@ static void handler_app_monitoring(void* parameters)
     xLastWakeTime = xTaskGetTickCount();
 
     STRUCT_RECOV_MNTR_t MNTR_recov;
+    STRUCT_PAYLOAD_MNTR_t MNTR_payload;
     STRUCT_BATTERY_MNTR_t MNTR_battery;
 
     while(1)
@@ -151,6 +158,10 @@ static void handler_app_monitoring(void* parameters)
         /* check task monitoring */
         #if(APPLICATION_INC_MNTR_RECOV == 1)
         if(API_RECOVERY_GET_MNTR(&MNTR_recov)) process_mntr_recov(MNTR_recov);
+        #endif
+
+        #if(APPLICATION_INC_MNTR_PAYLOAD == 1)
+        if(API_PAYLOAD_GET_MNTR(&MNTR_payload)) process_mntr_payload(MNTR_payload);
         #endif
 
         #if(APPLICATION_INC_MNTR_BATTERY == 1)
@@ -203,7 +214,7 @@ static void handler_app_windows(void* parameters)
                 API_BUZZER_SEND_PARAMETER(BUZZER_DESCEND_PERIOD, BUZZER_DESCEND_DUTYCYCLE);
 
                 /* force the opening */
-                API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+                API_RECOVERY_SEND_CMD(E_CMD_RECOV_OPEN);
 
                 /* update the phase */
                 phase = E_PHASE_DESCEND;
@@ -240,7 +251,7 @@ static void handler_app_recovery(void* parameters)
                 API_BUZZER_SEND_PARAMETER(BUZZER_DESCEND_PERIOD, BUZZER_DESCEND_DUTYCYCLE);
 
                 /* force the opening */
-                API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+                API_RECOVERY_SEND_CMD(E_CMD_RECOV_OPEN);
 
                 /* update phase */
                 phase = E_PHASE_DESCEND;
@@ -252,6 +263,26 @@ static void handler_app_recovery(void* parameters)
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(APPLICATION_DEFAULT_PERIOD_RECOVERY));
     }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       parameters 
+ * ************************************************************* **/
+static void handler_app_payload(void* parameters)
+{
+    /* supend itself and wait to be called */
+    vTaskSuspend(NULL);
+
+    while(1)
+    {
+        /* force the opening */
+        API_PAYLOAD_SEND_CMD(E_CMD_PL_OPEN);
+
+        /* suspend itself */
+        vTaskSuspend(NULL);
+    } 
 }
 
 /** ************************************************************* *
@@ -273,11 +304,11 @@ static void handler_app_user_buttons(void* parameters)
             {
                 if(HAL_GPIO_ReadPin(RECOVERY_OPEN_GPIO_Port, RECOVERY_OPEN_Pin) == GPIO_PIN_SET)
                 {
-                    API_RECOVERY_SEND_CMD(E_CMD_OPEN);
+                    API_RECOVERY_SEND_CMD(E_CMD_RECOV_OPEN);
                 }
                 else
                 {
-                    API_RECOVERY_SEND_CMD(E_CMD_STOP);
+                    API_RECOVERY_SEND_CMD(E_CMD_RECOV_STOP);
                 }
             }
 
@@ -286,11 +317,11 @@ static void handler_app_user_buttons(void* parameters)
             {
                 if(HAL_GPIO_ReadPin(RECOVERY_CLOSE_GPIO_Port, RECOVERY_CLOSE_Pin) == GPIO_PIN_SET)
                 {
-                    API_RECOVERY_SEND_CMD(E_CMD_CLOSE);
+                    API_RECOVERY_SEND_CMD(E_CMD_RECOV_CLOSE);
                 }
                 else
                 {
-                    API_RECOVERY_SEND_CMD(E_CMD_STOP);
+                    API_RECOVERY_SEND_CMD(E_CMD_RECOV_STOP);
                 }
             }
         }
@@ -307,19 +338,19 @@ static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV)
     /* send to hmi the last cmd received by the recovery */
     switch(MNTR_RECOV.last_cmd)
     {
-        case E_CMD_NONE:
+        case E_CMD_RECOV_NONE:
             API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "n");
             break;
 
-        case E_CMD_STOP:
+        case E_CMD_RECOV_STOP:
             API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "s");
             break;
 
-        case E_CMD_OPEN:
+        case E_CMD_RECOV_OPEN:
             API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "o");
             break;
 
-        case E_CMD_CLOSE:
+        case E_CMD_RECOV_CLOSE:
             API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "c");
             break;
         
@@ -330,23 +361,81 @@ static void process_mntr_recov(STRUCT_RECOV_MNTR_t MNTR_RECOV)
     /* send to hmi the status of the recovery */
     switch(MNTR_RECOV.status)
     {
-        case E_STATUS_NONE:
+        case E_STATUS_RECOV_NONE:
             API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "n");
             break;
 
-        case E_STATUS_STOP:
+        case E_STATUS_RECOV_STOP:
             API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "s");
             break;
 
-        case E_STATUS_RUNNING:
+        case E_STATUS_RECOV_RUNNING:
             API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "r");
             break;
 
-        case E_STATUS_OPEN:
+        case E_STATUS_RECOV_OPEN:
             API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "o");
             break;
 
-        case E_STATUS_CLOSE:
+        case E_STATUS_RECOV_CLOSE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "c");
+            break;
+        
+        default:
+            break;
+    }
+}
+
+/** ************************************************************* *
+ * @brief       
+ * 
+ * @param       MNTR_PAYLOAD 
+ * ************************************************************* **/
+static void process_mntr_payload(STRUCT_PAYLOAD_MNTR_t MNTR_PAYLOAD)
+{
+    /* send to hmi the last cmd received by the recovery */
+    switch(MNTR_PAYLOAD.last_cmd)
+    {
+        case E_CMD_PL_NONE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "n");
+            break;
+
+        case E_CMD_PL_STOP:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "s");
+            break;
+
+        case E_CMD_PL_OPEN:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "o");
+            break;
+
+        case E_CMD_PL_CLOSE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_LAST_CMD, "c");
+            break;
+        
+        default:
+            break;
+    }
+
+    /* send to hmi the status of the recovery */
+    switch(MNTR_PAYLOAD.status)
+    {
+        case E_STATUS_PL_NONE:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "n");
+            break;
+
+        case E_STATUS_PL_STOP:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "s");
+            break;
+
+        case E_STATUS_PL_RUNNING:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "r");
+            break;
+
+        case E_STATUS_PL_OPEN:
+            API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "o");
+            break;
+
+        case E_STATUS_PL_CLOSE:
             API_HMI_SEND_DATA(HMI_ID_RECOV_STATUS, "c");
             break;
         
@@ -423,6 +512,8 @@ void API_APPLICATION_START(void)
     status = xTaskCreate(handler_app_windows, "task_app_windows", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_WINDOWS, &TaskHandle_app_windows);
     configASSERT(status == pdPASS);
     status = xTaskCreate(handler_app_recovery, "task_app_recovery", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_RECOVERY, &TaskHandle_app_recovery);
+    configASSERT(status == pdPASS);
+    status = xTaskCreate(handler_app_payload, "task_app_payload", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_PAYLOAD, &TaskHandle_app_payload);
     configASSERT(status == pdPASS);
     status = xTaskCreate(handler_app_user_buttons, "task_app_user_buttons", 2*configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_APP_USER_BUTTONS, &TaskHandle_app_user_buttons);
     configASSERT(status == pdPASS);

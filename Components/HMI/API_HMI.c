@@ -31,7 +31,7 @@
 #define HMI_DEFAULT_QUEUE_SIZE      32u 
 #define HMI_DEFAULT_BUFFER_SIZE     16u
 #define HMI_DEFAULT_UART_TIMEOUT    1u
-#define HMI_DEFAULT_HEADER          "[%d]"
+#define HMI_DEFAULT_HEADER          "[%x]"
 
 /* ------------------------------------------------------------- --
    handles

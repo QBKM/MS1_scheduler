@@ -1,16 +1,15 @@
 /** ************************************************************* *
- * @file        API_recovery.h
+ * @file        API_payload.h
  * @brief       
  * 
- * @date        2021-10-11
+ * @date        2021-12-08
  * @author      Quentin Bakrim (quentin.bakrim@hotmail.fr)
  * 
  * Mines Space
  * 
  * ************************************************************* **/
-
-#ifndef RECOVERY_INC_API_RECOVERY_H_
-#define RECOVERY_INC_API_RECOVERY_H_
+#ifndef PAYLOAD_INC_API_PAYLOAD_H_
+#define PAYLOAD_INC_API_PAYLOAD_H_
 
 /* ------------------------------------------------------------- --
    includes
@@ -26,42 +25,42 @@
  * -> Open/Close command: will run the motors until reach the end */
 typedef enum
 {
-    E_CMD_RECOV_NONE,
-    E_CMD_RECOV_STOP,
-    E_CMD_RECOV_OPEN,
-    E_CMD_RECOV_CLOSE
-}ENUM_RECOV_CMD_t;
+    E_CMD_PL_NONE,
+    E_CMD_PL_STOP,
+    E_CMD_PL_OPEN,
+    E_CMD_PL_CLOSE
+}ENUM_PAYLOAD_CMD_t;
 
 /* List of system status */
 typedef enum
 {
-    E_STATUS_RECOV_NONE,          /* default state */
-    E_STATUS_RECOV_STOP,          /* state when the system is stop */
-    E_STATUS_RECOV_RUNNING,       /* state when the system is running */
-    E_STATUS_RECOV_OPEN,          /* state when the system is opened */
-    E_STATUS_RECOV_CLOSE          /* state when the system is closed */
-}ENUM_RECOV_STATUS_t;
+    E_STATUS_PL_NONE,          /* default state */
+    E_STATUS_PL_STOP,          /* state when the system is stop */
+    E_STATUS_PL_RUNNING,       /* state when the system is running */
+    E_STATUS_PL_OPEN,          /* state when the system is opened */
+    E_STATUS_PL_CLOSE          /* state when the system is closed */
+}ENUM_PAYLOAD_STATUS_t;
 
 /* main structure */
 typedef struct
 {
-    ENUM_RECOV_CMD_t last_cmd;       /* last command running */
-    ENUM_RECOV_STATUS_t status;      /* current status of the system */
-}STRUCT_RECOV_t;
+    ENUM_PAYLOAD_CMD_t last_cmd;       /* last command running */
+    ENUM_PAYLOAD_STATUS_t status;      /* current status of the system */
+}STRUCT_PAYLOAD_t;
 
 /* monitoring structure */
-typedef STRUCT_RECOV_t STRUCT_RECOV_MNTR_t;
+typedef STRUCT_PAYLOAD_t STRUCT_PAYLOAD_MNTR_t;
 
 /* ------------------------------------------------------------- --
    function propotypes
 -- ------------------------------------------------------------- */
-void API_RECOVERY_START(void);
-void API_RECOVERY_SEND_CMD(ENUM_RECOV_CMD_t command);
-bool API_RECOVERY_GET_MNTR(STRUCT_RECOV_MNTR_t* monitoring);
-void API_RECOVERY_CALLBACK(void);
+void API_PAYLOAD_START(void);
+void API_PAYLOAD_SEND_CMD(ENUM_PAYLOAD_CMD_t command);
+bool API_PAYLOAD_GET_MNTR(STRUCT_PAYLOAD_MNTR_t* monitoring);
+void API_PAYLOAD_CALLBACK(void);
 
 /* ------------------------------------------------------------- --
    end of file
 -- ------------------------------------------------------------- */
 
-#endif /* RECOVERY_INC_API_RECOVERY_H_ */
+#endif /* PAYLOAD_INC_API_PAYLOAD_H_ */

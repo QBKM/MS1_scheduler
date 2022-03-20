@@ -49,6 +49,10 @@
 #define HMI_ID_RECOV_LAST_CMD       (uint8_t)0x40
 #define HMI_ID_RECOV_STATUS         (uint8_t)0x41
 
+/* payload IDs */
+#define HMI_ID_PAYLOAD_LAST_CMD     (uint8_t)0x50
+#define HMI_ID_PAYLOAD_STATUS       (uint8_t)0x51
+
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
