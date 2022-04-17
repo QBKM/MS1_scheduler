@@ -26,18 +26,16 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define BATTERY_DEFAULT_PERIOD_TASK         1000u   /* [ms] */
-#define BATTERY_DEFAULT_TIMEOUT_TASK        60000u  /* [ms] */
-#define BATTERY_DEFAULT_MAX_VOLTAGE         18u     /* [volt] */
-#define BATTERY_DEFAULT_ADC_RANGE           1024u
-#define BATTERY_DEFAULT_THRESHOLD_VOLTAGE   7.5f    /* [volt] */
+#define BATTERY_MAX_VOLTAGE         18u     /* [volt] */
+#define BATTERY_THRESHOLD_VOLTAGE   7.5f    /* [volt] */
+#define BATTERY_ADC_RANGE           1024u
 
-#define BATTERY_DEFAULT_ADC_VBAT_SEQ        0
-#define BATTERY_DEFAULT_ADC_IBAT_SEQ        1
-#define BATTERY_DEFAULT_ADC_VBAT_MOTOR_1    2
-#define BATTERY_DEFAULT_ADC_IBAT_MOTOR_1    3
-#define BATTERY_DEFAULT_ADC_VBAT_MOTOR_2    4
-#define BATTERY_DEFAULT_ADC_IBAT_MOTOR_2    5
+#define BATTERY_ADC_VBAT_SEQ        0
+#define BATTERY_ADC_IBAT_SEQ        1
+#define BATTERY_ADC_VBAT_MOTOR_1    2
+#define BATTERY_ADC_IBAT_MOTOR_1    3
+#define BATTERY_ADC_VBAT_MOTOR_2    4
+#define BATTERY_ADC_IBAT_MOTOR_2    5
 
 /* ------------------------------------------------------------- --
    types
@@ -57,11 +55,9 @@ QueueHandle_t QueueHandle_battery_mntr;
    prototypes
 -- ------------------------------------------------------------- */
 static void handler_battery(void* parameters);
-static bool status_toggle(ENUM_BATTERY_STATUS_t status);
 static float convert_adc_volt(uint32_t raw_adc);
 static float convert_adc_current(uint32_t raw_adc);
 static ENUM_BATTERY_STATUS_t update_status(TYPE_BATTERY_VOLTAGE_t volt);
-static ENUM_BATTERY_STATUS_t update_status_overall(STRUCT_BATTERY_t allBatteryStruct);
 
 /* ============================================================= ==
    tasks functions
@@ -76,12 +72,6 @@ static void handler_battery(void* parameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
-    /* timeout data */
-    xTimeOutType timeOutHandler; 
-    portTickType timeOutCounter;
-    vTaskSetTimeOutState(&timeOutHandler);
-    timeOutCounter = pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK);
-
     STRUCT_BATTERY_t DATA = {0};
 
     uint32_t adc_result[6]; 
@@ -90,54 +80,23 @@ static void handler_battery(void* parameters)
     while(1)
     {
         /* update batteries values from ADC */
-        DATA.BAT_SEQ.volt       = convert_adc_volt(adc_result[BATTERY_DEFAULT_ADC_VBAT_SEQ]);
-        DATA.BAT_SEQ.current    = convert_adc_current(adc_result[BATTERY_DEFAULT_ADC_IBAT_SEQ]);
-        DATA.BAT_MOTOR1.volt    = convert_adc_volt(adc_result[BATTERY_DEFAULT_ADC_VBAT_MOTOR_1]);
-        DATA.BAT_MOTOR1.current = convert_adc_current(adc_result[BATTERY_DEFAULT_ADC_IBAT_MOTOR_1]);
-        DATA.BAT_MOTOR2.volt    = convert_adc_volt(adc_result[BATTERY_DEFAULT_ADC_VBAT_MOTOR_2]);
-        DATA.BAT_MOTOR2.current = convert_adc_current(adc_result[BATTERY_DEFAULT_ADC_IBAT_MOTOR_2]);
+        DATA.BAT_SEQ.volt       = convert_adc_volt(adc_result[BATTERY_ADC_VBAT_SEQ]);
+        DATA.BAT_SEQ.current    = convert_adc_current(adc_result[BATTERY_ADC_IBAT_SEQ]);
+        DATA.BAT_MOTOR1.volt    = convert_adc_volt(adc_result[BATTERY_ADC_VBAT_MOTOR_1]);
+        DATA.BAT_MOTOR1.current = convert_adc_current(adc_result[BATTERY_ADC_IBAT_MOTOR_1]);
+        DATA.BAT_MOTOR2.volt    = convert_adc_volt(adc_result[BATTERY_ADC_VBAT_MOTOR_2]);
+        DATA.BAT_MOTOR2.current = convert_adc_current(adc_result[BATTERY_ADC_IBAT_MOTOR_2]);
 
         /* update batteries status */
         DATA.BAT_SEQ.status    = update_status(DATA.BAT_SEQ.volt);
         DATA.BAT_MOTOR1.status = update_status(DATA.BAT_MOTOR1.volt);
         DATA.BAT_MOTOR2.status = update_status(DATA.BAT_MOTOR2.volt);
-        DATA.STATUS            = update_status_overall(DATA);
 
-        /* send to monitoring if the battery status toggle */
-        if(status_toggle(DATA.STATUS) == true)
-        {
-            xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
-        }
-
-        /* send to monitoring at periodic time */
-        if(xTaskCheckForTimeOut(&timeOutHandler, &timeOutCounter) == pdTRUE)
-        {
-            xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
-            timeOutCounter = pdMS_TO_TICKS(BATTERY_DEFAULT_TIMEOUT_TASK + BATTERY_DEFAULT_PERIOD_TASK);
-        }
+        xQueueSend(QueueHandle_battery_mntr, &DATA, 0);
 
         /* wait until next task period */
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(BATTERY_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, TASK_PERIOD_BATTERY);
     }
-}
-
-/** ************************************************************* *
- * @brief       
- * 
- * @param       status 
- * @return      true 
- * @return      false 
- * ************************************************************* **/
-static bool status_toggle(ENUM_BATTERY_STATUS_t status)
-{
-    static ENUM_BATTERY_STATUS_t last = E_BATTERY_NONE;
-    bool res;
-
-    /* if the value isn't the same than previous return true */
-    res = (last != status) ? true : false;
-    last = status;
-
-    return res;
 }
 
 /** ************************************************************* *
@@ -148,7 +107,7 @@ static bool status_toggle(ENUM_BATTERY_STATUS_t status)
  * ************************************************************* **/
 static float convert_adc_volt(uint32_t raw_adc)
 {
-    return (BATTERY_DEFAULT_MAX_VOLTAGE * ((float)raw_adc / BATTERY_DEFAULT_ADC_RANGE));
+    return (BATTERY_MAX_VOLTAGE * ((float)raw_adc / BATTERY_ADC_RANGE));
 }
 
 /** ************************************************************* *
@@ -173,7 +132,7 @@ static ENUM_BATTERY_STATUS_t update_status(TYPE_BATTERY_VOLTAGE_t volt)
 {
 	ENUM_BATTERY_STATUS_t result;
 
-	if(volt < BATTERY_DEFAULT_THRESHOLD_VOLTAGE)
+	if(volt < BATTERY_THRESHOLD_VOLTAGE)
     {
     	result = E_BATTERY_KO;
     }
@@ -183,30 +142,6 @@ static ENUM_BATTERY_STATUS_t update_status(TYPE_BATTERY_VOLTAGE_t volt)
     }
 
     return result;
-}
-
-/** ************************************************************* *
- * @brief       
- * 
- * @param       allBatteryStruct 
- * @return      ENUM_BATTERY_STATUS_t 
- * ************************************************************* **/
-static ENUM_BATTERY_STATUS_t update_status_overall(STRUCT_BATTERY_t mainStruct)
-{
-	ENUM_BATTERY_STATUS_t result;
-
-	if((mainStruct.BAT_SEQ.status    == E_BATTERY_KO)
-	|| (mainStruct.BAT_MOTOR1.status == E_BATTERY_KO)
-	|| (mainStruct.BAT_MOTOR2.status == E_BATTERY_KO))
-	{
-		result = E_BATTERY_KO;
-	}
-	else
-	{
-		result = E_BATTERY_OK;
-	}
-
-	return result;
 }
 
 /* ============================================================= ==

@@ -25,7 +25,6 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define RECOVERY_PERIOD_TASK    100u    /* [ms] */
 #define RECOVERY_CCR2_M1        3840u   /* 80% PWM (ARR = 4800) */
 #define RECOVERY_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
 
@@ -80,7 +79,7 @@ static void handler_recovery(void* parameters)
         check_position();
 
         /* wait until next task period */
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(RECOVERY_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, TASK_PERIOD_RECOVERY);
     }
 }
 
@@ -212,9 +211,8 @@ void API_RECOVERY_START(void)
     recov_mntr.status     = E_STATUS_RECOV_NONE;
 
     /* init the motors pwm dutycycle */
-    TIM2->CCR2 = RECOVERY_DEFAULT_CCR2_M1;
-    TIM3->CCR3 = RECOVERY_DEFAULT_CCR2_M2;
-    TIM4->CCR2 = RECOVERY_DEFAULT_CCR2_M2;
+    TIM2->CCR2 = RECOVERY_CCR2_M1;
+    TIM3->CCR3 = RECOVERY_CCR2_M2;
 
     /* create the queues */
     QueueHandle_recov_cmd  = xQueueCreate(1, sizeof(ENUM_RECOV_CMD_t));

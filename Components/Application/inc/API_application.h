@@ -15,20 +15,15 @@
 /* ------------------------------------------------------------- --
    types
 -- ------------------------------------------------------------- */
-typedef enum
-{
-    E_PHASE_WAIT,
-    E_PHASE_ASCEND,
-    E_PHASE_DESCEND,
-    E_PHASE_END
-}ENUM_PHASE_t;
 
 typedef enum
 {
     E_APP_ISR_NONE,
     E_APP_ISR_AEROC,
     E_APP_ISR_RECOV_OPEN,
-    E_APP_ISR_RECOV_CLOSE
+    E_APP_ISR_RECOV_CLOSE,
+    E_APP_ISR_PAYLOAD_OPEN,
+    E_APP_ISR_PAYLOAD_CLOSE
 }ENUM_APP_ISR_ID_t;
 
 /* ------------------------------------------------------------- --
