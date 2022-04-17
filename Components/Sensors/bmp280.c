@@ -15,36 +15,42 @@
 #include "bmp280.h"
 #include "i2c.h"
 
+
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
 /* BMP280 registers */
-#define BMP280_REG_TEMP_XLSB   	0xFC /* bits: 7-4 */
-#define BMP280_REG_TEMP_LSB    	0xFB
-#define BMP280_REG_TEMP_MSB    	0xFA
-#define BMP280_REG_TEMP        	(BMP280_REG_TEMP_MSB)
-#define BMP280_REG_PRESS_XLSB  	0xF9 /* bits: 7-4 */
-#define BMP280_REG_PRESS_LSB   	0xF8
-#define BMP280_REG_PRESS_MSB   	0xF7
-#define BMP280_REG_PRESSURE    	(BMP280_REG_PRESS_MSB)
-#define BMP280_REG_CONFIG      	0xF5 /* bits: 7-5 t_sb; 4-2 filter; 0 spi3w_en */
-#define BMP280_REG_CTRL        	0xF4 /* bits: 7-5 osrs_t; 4-2 osrs_p; 1-0 mode */
-#define BMP280_REG_STATUS      	0xF3 /* bits: 3 measuring; 0 im_update */
-#define BMP280_REG_RESET       	0xE0
-#define BMP280_REG_ID          	0xD0
-#define BMP280_REG_CALIB       	0x88
-#define BMP280_RESET_VALUE     	0xB6
+#define BMP280_REG_TEMP_XLSB   0xFC /* bits: 7-4 */
+#define BMP280_REG_TEMP_LSB    0xFB
+#define BMP280_REG_TEMP_MSB    0xFA
+#define BMP280_REG_TEMP        (BMP280_REG_TEMP_MSB)
+#define BMP280_REG_PRESS_XLSB  0xF9 /* bits: 7-4 */
+#define BMP280_REG_PRESS_LSB   0xF8
+#define BMP280_REG_PRESS_MSB   0xF7
+#define BMP280_REG_PRESSURE    (BMP280_REG_PRESS_MSB)
+#define BMP280_REG_CONFIG      0xF5 /* bits: 7-5 t_sb; 4-2 filter; 0 spi3w_en */
+#define BMP280_REG_CTRL        0xF4 /* bits: 7-5 osrs_t; 4-2 osrs_p; 1-0 mode */
+#define BMP280_REG_STATUS      0xF3 /* bits: 3 measuring; 0 im_update */
+#define BMP280_REG_RESET       0xE0
+#define BMP280_REG_ID          0xD0
+#define BMP280_REG_CALIB       0x88
+#define BMP280_RESET_VALUE     0xB6
 
-#define I2C_TIMEOUT				1
-#define I2C_HANDLER				hi2c2
+#define TIMEOUT_I2C 1
 
-#define BMP280_ADDR				0x76	/* BMP280 address is 0x77 if SDO pin is high, and is 0x76 if low */
-#define BMP280_CHIP_ID			0x58	/* BMP280 has chip-id 0x58 */
+#define BMP280_ADDR			0x76	/* BMP280 address is 0x77 if SDO pin is high, and is 0x76 if low */
+#define BMP280_CHIP_ID		0x58	/* BMP280 has chip-id 0x58 */
+
+
+/* ------------------------------------------------------------- --
+   types
+-- ------------------------------------------------------------- */
 
 /* ------------------------------------------------------------- --
    variables
 -- ------------------------------------------------------------- */
 BMP280_t BMP280;
+
 
 /* ------------------------------------------------------------- --
    private prototypes
@@ -55,6 +61,7 @@ static uint8_t bmp280_read_calibration_data(void);
 
 static int32_t bmp280_compensate_temperature(int32_t adc_temp, int32_t *fine_temp);
 static uint32_t bmp280_compensate_pressure(int32_t adc_press, int32_t fine_temp);
+
 
 /* ============================================================= ==
    private functions
@@ -73,7 +80,7 @@ uint8_t bmp280_read_fixed(int32_t *temperature, uint32_t *pressure)
 	int32_t fine_temp;
 	uint8_t data[6];
 
-	if(HAL_I2C_Mem_Read(&I2C_HANDLER, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, data, sizeof(data), I2C_TIMEOUT)) return HAL_ERROR;
+	if(HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, data, sizeof(data), TIMEOUT_I2C)) return HAL_ERROR;
 
 	adc_pressure = data[0] << 12 | data[1] << 4 | data[2] >> 4;
 	adc_temp = data[3] << 12 | data[4] << 4 | data[5] >> 4;
@@ -172,7 +179,7 @@ static uint8_t bmp280_read_register16(uint8_t addr, uint16_t *value)
 {
 	uint8_t rx_buff[2];
 
-	if (HAL_I2C_Mem_Read(&I2C_HANDLER, BMP280_ADDR<<1, addr, 1, rx_buff, 2, 5000) == HAL_OK)
+	if (HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, addr, 1, rx_buff, 2, 5000) == HAL_OK)
 	{
 		*value = (uint16_t) ((rx_buff[1] << 8) | rx_buff[0]);
 		return true;
@@ -198,8 +205,8 @@ uint8_t BMP280_Init(void)
     uint8_t data;
 
     /* initialize the temperature and the pressure to 0 */
-    BMP280.data.pressure 	= 0.0;
-    BMP280.data.temperature 	= 0.0;
+    BMP280.pressure 	= 0.0;
+    BMP280.temperature 	= 0.0;
 
     /* Structure to configure the BMP280 */
     BMP280_config_t config =
@@ -213,16 +220,16 @@ uint8_t BMP280_Init(void)
 	BMP280.config = config;
 
 	/* check device ID WHO_AM_I */
-	if(HAL_I2C_Mem_Read(&I2C_HANDLER, BMP280_ADDR<<1, BMP280_REG_ID, 1, &check, 1, I2C_TIMEOUT)) return HAL_ERROR;
+	if(HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_ID, 1, &check, 1, TIMEOUT_I2C)) return HAL_ERROR;
 	if(check != BMP280_CHIP_ID) return false;
 
 	/* reset the chip */
-	if(HAL_I2C_Mem_Write(&I2C_HANDLER, BMP280_ADDR<<1, BMP280_REG_RESET, 1, (uint8_t*)BMP280_RESET_VALUE, 1, I2C_TIMEOUT)) return HAL_ERROR;
+	if(HAL_I2C_Mem_Write(&hi2c2, BMP280_ADDR<<1, BMP280_REG_RESET, 1, (uint8_t*)BMP280_RESET_VALUE, 1, TIMEOUT_I2C)) return HAL_ERROR;
 
 	/* Wait until finished copying over the NVP data */
 	while (1)
 	{
-		if(!HAL_I2C_Mem_Read(&I2C_HANDLER, BMP280_ADDR<<1, BMP280_REG_STATUS, 1, &status, 1, I2C_TIMEOUT) && (status & 1) == 0) break;
+		if(!HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_STATUS, 1, &status, 1, TIMEOUT_I2C) && (status & 1) == 0) break;
 	}
 
 	/* read calibration data */
@@ -230,11 +237,11 @@ uint8_t BMP280_Init(void)
 
 	/* Config register */
 	data = (BMP280.config.standby << 5 | BMP280.config.filter << 2);
-	if(HAL_I2C_Mem_Write(&I2C_HANDLER, BMP280_ADDR<<1, BMP280_REG_CONFIG, 1, &data, 1, I2C_TIMEOUT)) return HAL_ERROR;
+	if(HAL_I2C_Mem_Write(&hi2c2, BMP280_ADDR<<1, BMP280_REG_CONFIG, 1, &data, 1, TIMEOUT_I2C)) return HAL_ERROR;
 
 	/* Control register */
 	data = (BMP280.config.oversampling_temperature << 5 | BMP280.config.oversampling_pressure << 2 | BMP280.config.mode);
-	if(HAL_I2C_Mem_Write(&I2C_HANDLER, BMP280_ADDR<<1, BMP280_REG_CTRL, 1, &data, 1, I2C_TIMEOUT)) return HAL_ERROR;
+	if(HAL_I2C_Mem_Write(&hi2c2, BMP280_ADDR<<1, BMP280_REG_CTRL, 1, &data, 1, TIMEOUT_I2C)) return HAL_ERROR;
 
 	return HAL_OK;
 }
@@ -251,8 +258,8 @@ uint8_t BMP280_Read_All(void)
 
 	if(!bmp280_read_fixed( &fixed_temperature, &fixed_pressure))
 	{
-		BMP280.data.temperature = (float) fixed_temperature / 100;
-		BMP280.data.pressure = (float) fixed_pressure / 256;
+		BMP280.temperature = (float) fixed_temperature / 100;
+		BMP280.pressure = (float) fixed_pressure / 256;
 		return HAL_OK;
 	}
 	return HAL_ERROR;
@@ -263,9 +270,9 @@ uint8_t BMP280_Read_All(void)
  * 
  * @return      BMP280_t 
  * ************************************************************* **/
-void BMP280_Get_All(BMP280_data_t* data)
+BMP280_t BMP280_Get_Struct(void)
 {
-	*data = BMP280.data;
+	return BMP280;
 }
 
 /* ------------------------------------------------------------- --

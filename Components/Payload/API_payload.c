@@ -25,10 +25,10 @@
 /* ------------------------------------------------------------- --
    defines
 -- ------------------------------------------------------------- */
-#define PAYLOAD_DEFAULT_PERIOD_TASK    100u     /* [ms] */
 #define PAYLOAD_DEFAULT_CCR2_M1        3840u   /* 80% PWM (ARR = 4800) */
 #define PAYLOAD_DEFAULT_CCR2_M2        3840u   /* 80% PWM (ARR = 4800) */
 
+#define TASK_PERIOD_PAYLOAD 100
 
 /* ------------------------------------------------------------- --
    handles
@@ -81,7 +81,7 @@ static void handler_payload(void* parameters)
         check_position();
 
         /* wait until next task period */
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(PAYLOAD_DEFAULT_PERIOD_TASK));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TASK_PERIOD_PAYLOAD));
     }
 }
 

@@ -45,7 +45,6 @@ typedef struct
 /* main structure */
 typedef struct
 {
-    ENUM_BATTERY_STATUS_t STATUS;
     STRUCT_BATTERY_DATA_t BAT_SEQ;
     STRUCT_BATTERY_DATA_t BAT_MOTOR1;
     STRUCT_BATTERY_DATA_t BAT_MOTOR2;
@@ -58,7 +57,7 @@ typedef STRUCT_BATTERY_t STRUCT_BATTERY_MNTR_t;
    function prototypes
 -- ------------------------------------------------------------- */
 void API_BATTERY_START(void);
-bool API_BATTERY_GET_MNTR(STRUCT_BATTERY_MNTR_t* monitoring);
+bool API_BATTERY_GET_MNTR(STRUCT_BATTERY_MNTR_t* MNTR);
 
 /* ------------------------------------------------------------- --
    end of file

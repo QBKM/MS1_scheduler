@@ -57,7 +57,6 @@ typedef STRUCT_PAYLOAD_t STRUCT_PAYLOAD_MNTR_t;
 void API_PAYLOAD_START(void);
 void API_PAYLOAD_SEND_CMD(ENUM_PAYLOAD_CMD_t command);
 bool API_PAYLOAD_GET_MNTR(STRUCT_PAYLOAD_MNTR_t* monitoring);
-void API_PAYLOAD_CALLBACK(void);
 
 /* ------------------------------------------------------------- --
    end of file

@@ -16,7 +16,7 @@
 /* ------------------------------------------------------------- --
    Includes
 -- ------------------------------------------------------------- */
-#include "stdint.h"
+#include <stdint.h>
 
 /* ------------------------------------------------------------- --
    types
@@ -27,7 +27,7 @@ typedef enum
 	MPU6050_AFS_2G 	= 0,
 	MPU6050_AFS_4G 	= 1,
 	MPU6050_AFS_8G 	= 2,
-	MPU6050_AFS_16G  = 3
+	MPU6050_AFS_16G   = 3
 }MPU6050_AccelFullScale;
 
 /* gyro full scale range settings */
@@ -56,87 +56,47 @@ typedef struct
 	MPU6050_SampleRate SR;
 }MPU6050_config_t;
 
-/* raw data structure */
-typedef struct
-{
-    int16_t X;
-    int16_t Y;
-    int16_t Z;
-}MPU6050_raw_accel_t;
-
-/* raw data structure */
-typedef struct
-{
-    int16_t X;
-    int16_t Y;
-    int16_t Z;
-}MPU6050_raw_gyro_t;
-
-/* raw data structure */
-typedef struct
-{
-    float X;
-    float Y;
-    float Z;
-}MPU6050_accel_t;
-
-/* raw data structure */
-typedef struct
-{
-    float X;
-    float Y;
-    float Z;
-}MPU6050_gyro_t;
-
-typedef int16_t MPU6050_raw_temp_t;
-typedef int16_t MPU6050_temp_t;
-
-/* raw data structure */
-typedef struct
-{
-    MPU6050_raw_accel_t A;
-    MPU6050_raw_gyro_t G;
-    MPU6050_raw_temp_t Temp;
-}MPU6050_raw_data_t;
-
-/* raw data structure */
-typedef struct
-{
-    MPU6050_accel_t A;
-    MPU6050_gyro_t G;
-    MPU6050_temp_t Temp;
-}MPU6050_data_t;
-
-typedef struct 
-{
-    float KalmanAngleX;
-    float KalmanAngleY;
-}MPU6050_kalman_data_t;
-
 /* MPU6050 handle structure */
 typedef struct 
 {
-    MPU6050_data_t data;
-    MPU6050_raw_data_t raw;
-    MPU6050_kalman_data_t kalman;
+    int16_t Accel_X_RAW;
+    int16_t Accel_Y_RAW;
+    int16_t Accel_Z_RAW;
+    float Ax;
+    float Ay;
+    float Az;
+
+    int16_t Gyro_X_RAW;
+    int16_t Gyro_Y_RAW;
+    int16_t Gyro_Z_RAW;
+    float Gx;
+    float Gy;
+    float Gz;
+
+    int16_t Temperature_RAW;
+    float Temperature;
+
+    float KalmanAngleX;
+    float KalmanAngleY;
+
     MPU6050_config_t config;
-}MPU6050_t;
+
+} MPU6050_t;
 
 
 /* ------------------------------------------------------------- --
    prototypes
 -- ------------------------------------------------------------- */
 uint8_t MPU6050_Init(void);
-
 uint8_t MPU6050_Read_Accel(void);
 uint8_t MPU6050_Read_Gyro(void);
 uint8_t MPU6050_Read_Temp(void);
 uint8_t MPU6050_Read_All(void);
-uint8_t MPU6050_Read_All_Kalman(float dt);
+uint8_t MPU6050_Read_All_Kalman(void);
+MPU6050_t MPU6050_Get_Struct(void);
 
-void MPU6050_Get_Struct(MPU6050_t* data);
 
-#endif /* __MPU6050_H__ */
+#endif /* INC_GY521_H_ */
 /* ------------------------------------------------------------- --
    end of files
 -- ------------------------------------------------------------- */

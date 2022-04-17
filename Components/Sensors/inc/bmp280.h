@@ -89,15 +89,11 @@ typedef struct
     int16_t  dig_P9;
 }BMP280_calibration_t;
 
-typedef struct
-{
-    float temperature;
-	float pressure;
-}BMP280_data_t;
-
 /* data structure */
 typedef struct BMP280_t{
-    BMP280_data_t data;
+	float temperature;
+	float pressure;
+
 	BMP280_config_t config;
 	BMP280_calibration_t calib;
 }BMP280_t;
@@ -107,12 +103,8 @@ typedef struct BMP280_t{
    fonctions
 -- ------------------------------------------------------------- */
 uint8_t BMP280_Init(void);
-
 uint8_t BMP280_Read_All(void);
-
-void BMP280_Get_Pressure(float pressure);
-void BMP280_Get_Temperature(float temperature);
-void BMP280_Get_All(BMP280_data_t* data);
+BMP280_t BMP280_Get_Struct(void);
 
 #endif  // __BMP280_H__
 /* ------------------------------------------------------------- --

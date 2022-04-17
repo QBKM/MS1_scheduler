@@ -20,8 +20,12 @@
 #include "stdio.h"
 #include "stdarg.h"
 #include "usart.h"
-#include "semphr.h"
-#include "dma.h"
+
+#include "TinyFrame.h"
+#include "utils.h"
+#include "string.h"
+
+TinyFrame *TinyFrame_TX;
 
 #include "MS1_config.h"
 
@@ -32,6 +36,13 @@
 #define HMI_DEFAULT_BUFFER_SIZE     16u
 #define HMI_DEFAULT_UART_TIMEOUT    1u
 #define HMI_DEFAULT_HEADER          "[%x]"
+
+
+typedef struct 
+{
+    TYPE_HMI_ID_t ID;
+    uint8_t buffer[16];
+}STRUCT_HMI_FORM_t;
 
 /* ------------------------------------------------------------- --
    handles
@@ -62,18 +73,21 @@ static void handler_hmi(void* parameters);
  * ************************************************************* **/
 static void handler_hmi(void* parameters)
 {
-	char buffer[HMI_DEFAULT_BUFFER_SIZE];
+	STRUCT_HMI_FORM_t form;
+    TF_Msg msg;
 
     while(1)
     {
         /* wait until receiving something */
-        xQueueReceive(QueueHandle_hmi, buffer, portMAX_DELAY);
+        xQueueReceive(QueueHandle_hmi, &form, portMAX_DELAY);
 
-        /* send data on UART */
-        HAL_UART_Transmit(&huart4, (uint8_t*)buffer, strlen(buffer), HMI_DEFAULT_UART_TIMEOUT);
+        TF_ClearMsg(&msg);
+        
+        msg.type = form.ID;
+        msg.data = form.buffer;
+        msg.len = sizeof(form.buffer);
 
-        /* wait the next tick to send another message */
-        vTaskDelay(1);
+        TF_Send(TinyFrame_TX, &msg);
     }
 }
 
@@ -88,8 +102,10 @@ void API_HMI_START(void)
 {
     BaseType_t status;
 
+    TinyFrame_TX = TF_Init(TF_MASTER); // 1 = master, 0 = slave
+
     /* create the queue */
-    QueueHandle_hmi = xQueueCreate(HMI_DEFAULT_QUEUE_SIZE, HMI_DEFAULT_BUFFER_SIZE);
+    QueueHandle_hmi = xQueueCreate(HMI_DEFAULT_QUEUE_SIZE, sizeof(STRUCT_HMI_FORM_t));
 
     /* create the task */
     status = xTaskCreate(handler_hmi, "task_hmi", configMINIMAL_STACK_SIZE, NULL, TASK_PRIORITY_HMI, &TaskHandle_hmi);
@@ -106,19 +122,27 @@ void API_HMI_START(void)
  * ************************************************************* **/
 void API_HMI_SEND_DATA(TYPE_HMI_ID_t  dataID, const char *fmt, ...)
 {
-    char buffer[HMI_DEFAULT_BUFFER_SIZE];
     va_list args;
     va_start(args, fmt);
 
-    /* add the header to the buffer */
-    sprintf(buffer, HMI_DEFAULT_HEADER, dataID);
-    
-    /* add payload to the buffer */
-    vsprintf(buffer + strlen(buffer), fmt, args);
+    STRUCT_HMI_FORM_t form;
+    form.ID = dataID;
+    memcpy(form.buffer, fmt, HMI_DEFAULT_BUFFER_SIZE);
+
     va_end(args);
 
     /* send to task */
-    xQueueSend(QueueHandle_hmi, buffer, 0);
+    xQueueSend(QueueHandle_hmi, &form, 0);
+}
+
+/**
+ * This function should be defined in the application code.
+ * It implements the lowest layer - sending bytes to UART (or other)
+ */
+void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+{
+    /* send data on UART */
+    HAL_UART_Transmit(&huart4, (uint8_t*)buff, len, HMI_DEFAULT_UART_TIMEOUT);
 }
 
 /* ------------------------------------------------------------- --
